@@ -38,12 +38,16 @@ export default function DashboardScreen() {
     loadVitals(userId, dateStr);
   }, [userId, dateStr]);
 
+  const userAge = profile?.dateOfBirth
+    ? Math.max(13, new Date().getFullYear() - parseInt(profile.dateOfBirth.split('-')[0], 10))
+    : 25;
+
   // Physiological Target Calculations (Derived from Profile)
   const bmr = profile
     ? calculateBmrMifflinStJeor({
         weightKg: profile.currentWeightKg,
         heightCm: profile.heightCm,
-        ageYears: 26, // Default or computed from DOB
+        ageYears: userAge,
         gender: profile.gender === 'female' ? 'female' : 'male',
       })
     : 1700;

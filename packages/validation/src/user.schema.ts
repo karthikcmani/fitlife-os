@@ -25,7 +25,7 @@ export const trainingEnvironmentSchema = z.enum(['gym', 'home', 'calisthenics'])
 export const unitSystemSchema = z.enum(['metric', 'imperial']);
 
 export const profileSetupSchema = z.object({
-  displayName: z.string().min(2, 'Name must be at least 2 characters').max(64),
+  displayName: z.string().trim().min(2, 'Name must be at least 2 characters').max(64),
   dateOfBirth: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
