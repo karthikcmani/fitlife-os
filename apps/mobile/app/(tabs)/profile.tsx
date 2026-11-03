@@ -102,14 +102,9 @@ export default function ProfileScreen() {
           Your transformation photos are encrypted using hardware-backed AES-256-GCM. All EXIF metadata (GPS, device serials) is stripped in memory. Photos are excluded from ordinary cloud and ADB backups.
         </Text>
         <Button
-          title="Authenticate & Unlock Vault"
+          title="Open Transformation Vault"
           variant="secondary"
-          onPress={() => {
-            Alert.alert(
-              'Hardware Biometric Security',
-              'Android Keystore KeyGenParameterSpec is verified. In accordance with ISSUE-002, photo files reside strictly in sandboxed storage with cryptographic erasure.'
-            );
-          }}
+          onPress={() => router.push('/photo-vault')}
           style={styles.unlockBtn}
         />
       </SurfaceCard>
@@ -153,6 +148,13 @@ export default function ProfileScreen() {
             style={styles.authBtn}
           />
         )}
+
+        <Button
+          title="Open Community & Challenges"
+          variant="secondary"
+          onPress={() => router.push('/community')}
+          style={{ marginTop: theme.spacing.sm }}
+        />
       </SurfaceCard>
     </ScreenContainer>
   );

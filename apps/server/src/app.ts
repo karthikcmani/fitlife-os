@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { healthRoutes } from './routes/health.routes';
 import { authRoutes } from './routes/auth.routes';
 import { syncRoutes } from './routes/sync.routes';
+import { communityRoutes } from './routes/community.routes';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -44,6 +45,7 @@ export function buildApp(): FastifyInstance {
       v1.register(healthRoutes);
       v1.register(authRoutes);
       v1.register(syncRoutes);
+      v1.register(communityRoutes, { prefix: '/community' });
     },
     { prefix: '/api/v1' }
   );
