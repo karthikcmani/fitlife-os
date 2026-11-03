@@ -29,12 +29,12 @@ Each decision entry must document:
 - **Status:** PROPOSED (Awaiting User Sign-off)
 - **Scope / Component:** Mobile Client (`apps/mobile`)
 - **Previous Decision:** Unspecified hybrid or native framework.
-- **Proposed Decision:** Adopt **React Native with Expo SDK 58 (Stable Production Release `expo@58.0.22`) using `expo prebuild` (Continuous Native Generation)** and a custom clean Config Plugin (`plugins/withFDroidClean.js`).
-- **Justification:** SDK 58 provides the modern New Architecture by default (TurboModules and Fabric with Hermes engine on Apache-2.0), supports Node v22.13.0, Gradle 8.8+, and OpenJDK 17, and eliminates legacy bridge serialization overhead. The custom config plugin deterministically strips proprietary Google Play Services and Firebase dependencies, generating a standard F-Droid compliant Gradle build.
+- **Proposed Decision:** Adopt **React Native with Expo SDK 58 (Stable Production Release `expo@58.0.22`, React Native 0.88.1, React 19.3.0) using `expo prebuild` (Continuous Native Generation)**.
+- **Justification:** SDK 58 provides the modern New Architecture by default (TurboModules and Fabric with Hermes engine on Apache-2.0), supports Node v22.13.0, Gradle 8.8+, and OpenJDK 17, and eliminates legacy bridge serialization overhead.
 - **Trade-off Analysis:**
   - *Benefits:* High developer velocity, cross-platform code reuse, shared TypeScript packages (`domain`, `validation`), native Hermes C++ execution, $<16\text{ ms}$ write latency.
-  - *Disadvantages:* Requires rigorous CI checks to prevent third-party npm packages from injecting transitive closed-source binary dependencies.
-- **F-Droid Compliance:** Verified feasible with custom config plugin stripping GMS and Firebase.
+  - *Disadvantages:* F-Droid compilation must be protected against proprietary transitive dependencies.
+- **F-Droid Compliance:** Requires clean native modules with zero Google Mobile Services.
 - **Approver:** Pending
 
 ---
@@ -44,7 +44,7 @@ Each decision entry must document:
 - **Status:** PROPOSED (Awaiting User Sign-off)
 - **Scope / Component:** Backend Server (`apps/server`)
 - **Previous Decision:** Unspecified server stack.
-- **Proposed Decision:** Adopt **Node.js + Fastify + TypeScript + PostgreSQL 16+**.
+- **Proposed Decision:** Adopt **Node.js + Fastify + TypeScript + PostgreSQL 16+ + Kysely + Caddy**.
 - **Justification:** Fastify delivers low overhead and fast I/O throughput; PostgreSQL provides robust relational integrity, JSONB support for sync payloads, and battle-tested ACID compliance.
 - **Trade-off Analysis:**
   - *Benefits:* Native TypeScript monorepo integration with `packages/validation` and `packages/domain`; simple self-hosting via Docker Compose.
@@ -59,19 +59,19 @@ Each decision entry must document:
 - **Status:** PROPOSED (Awaiting User Sign-off)
 - **Scope / Component:** Local Storage & Data Synchronization
 - **Previous Decision:** Unspecified offline storage.
-- **Proposed Decision:** Use **Expo SQLite** with Write-Ahead Logging (WAL) and an append-only **Sync Queue** leveraging **Hybrid Logical Clocks (HLC)**, idempotent batch mutations (`POST /api/v1/sync/push`), field-level Last-Write-Wins (LWW) for mutable entities, and soft-delete tombstone propagation.
-- **Justification:** Pure Lamport clocks cannot distinguish true concurrency from causality and ignore physical clock drift; HLC combines physical time with logical sequencing, preventing phantom overwrites and drift anomalies while maintaining $<16\text{ ms}$ local write performance.
+- **Proposed Decision:** Use **Expo SQLite** with Write-Ahead Logging (WAL) and an append-only **Sync Queue** leveraging **Hybrid Logical Clocks (HLC)**, idempotent batch mutations (`POST /api/v1/sync/push`), field-level Last-Write-Wins (LWW) for mutable entities, soft-delete tombstones, and server-side `idempotency_ledger` providing **effectively-once processing**.
+- **Justification:** Resolves physical clock skew, guarantees deterministic multi-device convergence, and safely handles lost acknowledgments without duplicating mutations.
 - **Approver:** Pending
 
 ---
 
-### DEC-2026-004: Push Notification Architecture for F-Droid
+### DEC-2026-004: Notification Architecture for F-Droid
 - **Date:** 2026-11-03
 - **Status:** PROPOSED (Awaiting User Sign-off)
 - **Scope / Component:** Notification Subsystem
-- **Previous Decision:** Unspecified push notifications.
-- **Proposed Decision:** Rely entirely on **local Android notifications and alarms** for personal health routines (workouts, hydration, habits, sleep). For optional server-triggered community events, support **UnifiedPush** (NextPush/ntfy) without requiring Google Cloud Messaging (FCM).
-- **Justification:** Google Play Services FCM violates pure F-Droid guidelines; local notifications provide 100% offline reliability with zero privacy leaks.
+- **Previous Decision:** Unspecified push notifications / `expo-notifications`.
+- **Proposed Decision:** Implement a dedicated local notification bridge (`@fitlife/local-notifications`) using pure Android Jetpack `androidx.core:core` (`NotificationCompat` + `AlarmManager`), completely omitting `expo-notifications` (which hardcodes Firebase Cloud Messaging). For optional community alerts, evaluate **UnifiedPush** (NextPush/ntfy).
+- **Justification:** Concrete inspection of `expo-notifications@58.1.7` tarball proved hardcoded Kotlin dependencies on `com.google.firebase:firebase-messaging`, which breaks F-Droid compilation when stripped. A dedicated lightweight local bridge guarantees 100% FLOSS F-Droid buildability.
 - **Approver:** Pending
 
 ---
