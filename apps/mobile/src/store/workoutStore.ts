@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { Exercise, WorkoutSession, WorkoutSet } from '@fitlife/shared-types';
+import { Exercise, WorkoutSession, WorkoutSet } from '../types';
 import { getLocalDatabase } from '../db/sqlite';
 import { SyncManager } from '../services/syncManager';
-import { estimate1RmBrzycki } from '@fitlife/domain';
+import { estimate1RmBrzycki } from '../domain';
 
 interface WorkoutState {
   exercises: Exercise[];

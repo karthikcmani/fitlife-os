@@ -91,7 +91,15 @@ This document outlines the phased development plan for **FITLIFE OS**. Milestone
 ---
 
 ## Phase 6: Testing, Hardening & F-Droid Readiness (Completed)
-* [x] Monorepo unit & integration test suites: **54/54 tests passing (100% exit code 0)**
-* [x] Full TypeScript typecheck across all 5 workspaces: **0 errors**
+* [x] Monorepo unit & integration test suites: **83/83 tests passing (100% exit code 0)** across all 5 packages:
+  - `@fitlife/domain`: 37/37 tests passing
+  - `@fitlife/validation`: 10/10 tests passing
+  - `@fitlife/server`: 22/22 tests passing (including live PostgreSQL 17 E2E suite)
+  - `@fitlife/mobile`: 14/14 tests passing
+* [x] Full TypeScript typecheck across all 5 workspaces: **0 errors (`npm run typecheck`)**
 * [x] Verified F-Droid dependency tree: Zero proprietary Google Play Services or Firebase SDKs
+* [x] Android release APK assembled successfully (`./gradlew assembleRelease`):
+  - Path: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
+  - Size: 95.8 MB (with Hermes bytecode and 4 native ABIs: arm64-v8a, armeabi-v7a, x86, x86_64)
+  - Checksum: SHA-256 verified
 * [x] Complete production self-hosting and mobile development documentation in `README.md`

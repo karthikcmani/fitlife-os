@@ -5,10 +5,10 @@ import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { Header } from '../../src/components/ui/Header';
 import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
 import { Button } from '../../src/components/ui/Button';
-import { useAuthStore } from '../../src/store/authStore';
+import { useAuthStore, getStoredAccessToken } from '../../src/store/authStore';
 import { SyncManager } from '../../src/services/syncManager';
 import { theme } from '../../src/theme';
-import { calculateBmrMifflinStJeor, calculateTdee } from '@fitlife/domain';
+import { calculateBmrMifflinStJeor, calculateTdee } from '../../src/domain';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -23,7 +23,17 @@ export default function ProfileScreen() {
 
   const handleSyncNow = async () => {
     setIsSyncing(true);
-    const result = await SyncManager.pushPendingMutations(backendUrl, 'mock_token');
+    const token = await getStoredAccessToken();
+    if (!token) {
+      Alert.alert(
+        'Account Connection Required',
+        'Please connect or register your self-hosted cloud account before synchronizing data.'
+      );
+      setIsSyncing(false);
+      return;
+    }
+
+    const result = await SyncManager.pushPendingMutations(backendUrl, token);
     const updatedCount = await SyncManager.getPendingCount();
     setPendingSyncCount(updatedCount);
     setIsSyncing(false);

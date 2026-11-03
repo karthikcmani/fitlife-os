@@ -5,7 +5,7 @@ import {
   HlcTimestamp,
   SyncPushBatchRequest,
   SyncPushBatchResponse,
-} from '@fitlife/shared-types';
+} from '../types';
 
 export class SyncManager {
   private static logicalCounter = 0;

@@ -7,7 +7,7 @@ import { Button } from '../../src/components/ui/Button';
 import { useWorkoutStore } from '../../src/store/workoutStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { theme } from '../../src/theme';
-import { estimate1RmBrzycki } from '@fitlife/domain';
+import { estimate1RmBrzycki } from '../../src/domain';
 
 export default function WorkoutScreen() {
   const { profile } = useAuthStore();
@@ -30,6 +30,7 @@ export default function WorkoutScreen() {
 
   // Set Logging State
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>('barbell-bench-press');
+  const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [inputWeight, setInputWeight] = useState('60');
   const [inputReps, setInputReps] = useState('8');
   const [inputRpe, setInputRpe] = useState('8');
@@ -78,14 +79,42 @@ export default function WorkoutScreen() {
             </View>
 
             {/* Exercise Selector */}
-            <Text style={styles.inputLabel}>Current Exercise:</Text>
+            <Text style={styles.inputLabel}>Current Exercise (Tap to Change):</Text>
             <TouchableOpacity
               style={styles.pickerBox}
-              onPress={() => {}}
+              onPress={() => setShowExercisePicker(!showExercisePicker)}
             >
               <Text style={styles.pickerText}>{selectedExercise?.name ?? selectedExerciseId}</Text>
-              <Text style={styles.pickerSub}>{selectedExercise?.equipmentRequired}</Text>
+              <Text style={styles.pickerSub}>{selectedExercise?.equipmentRequired} • {showExercisePicker ? '▲ Close' : '▼ Change'}</Text>
             </TouchableOpacity>
+
+            {showExercisePicker && (
+              <View style={styles.exercisePickerDropdown}>
+                <TextInput
+                  style={styles.searchBarSmall}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Filter exercises..."
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+                {exercises.slice(0, 8).map((ex) => (
+                  <TouchableOpacity
+                    key={ex.id}
+                    style={[
+                      styles.dropdownItem,
+                      selectedExerciseId === ex.id && styles.selectedDropdownItem,
+                    ]}
+                    onPress={() => {
+                      setSelectedExerciseId(ex.id);
+                      setShowExercisePicker(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownText}>{ex.name}</Text>
+                    <Text style={styles.dropdownSub}>{ex.primaryMuscleGroup} • {ex.equipmentRequired}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Quick Set Inputs */}
             <View style={styles.inputsRow}>
@@ -471,6 +500,46 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
     textTransform: 'capitalize',
+  },
+  exercisePickerDropdown: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    padding: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.md,
+    gap: 6,
+  },
+  searchBarSmall: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    color: theme.colors.textPrimary,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    ...theme.typography.caption,
+    marginBottom: 4,
+  },
+  dropdownItem: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface,
+  },
+  selectedDropdownItem: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary,
+  },
+  dropdownText: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+  },
+  dropdownSub: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontSize: 11,
   },
   historyRow: {
     flexDirection: 'row',

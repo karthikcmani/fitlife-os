@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { AuthUser, UserProfile } from '@fitlife/shared-types';
+import { AuthUser, UserProfile } from '../types';
 import { getLocalDatabase } from '../db/sqlite';
 
 const ACCESS_TOKEN_KEY = 'fitlife_access_token';
@@ -115,3 +115,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setBackendUrl: (url) => set({ backendUrl: url }),
 }));
+
+export async function getStoredAccessToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+}
+
+export async function getStoredRefreshToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+}

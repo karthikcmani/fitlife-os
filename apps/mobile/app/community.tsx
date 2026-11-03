@@ -14,7 +14,7 @@ import { SurfaceCard } from '../src/components/ui/SurfaceCard';
 import { Button } from '../src/components/ui/Button';
 import { Header } from '../src/components/ui/Header';
 import { theme } from '../src/theme';
-import { useAuthStore } from '../src/store/authStore';
+import { useAuthStore, getStoredAccessToken } from '../src/store/authStore';
 
 interface Challenge {
   id: string;
@@ -89,6 +89,31 @@ export default function CommunityScreen() {
   const [newPostContent, setNewPostContent] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
+  useEffect(() => {
+    async function loadRemoteCommunity() {
+      if (!backendUrl) return;
+      try {
+        const feedRes = await fetch(`${backendUrl}/api/v1/community/feed`);
+        if (feedRes.ok) {
+          const feedData = await feedRes.json();
+          if (feedData.posts && feedData.posts.length > 0) {
+            setPosts(feedData.posts);
+          }
+        }
+        const chalRes = await fetch(`${backendUrl}/api/v1/community/challenges`);
+        if (chalRes.ok) {
+          const chalData = await chalRes.json();
+          if (chalData.challenges && chalData.challenges.length > 0) {
+            setChallenges(chalData.challenges);
+          }
+        }
+      } catch {
+        // Offline: gracefully retain baseline challenges & feed
+      }
+    }
+    loadRemoteCommunity();
+  }, [backendUrl]);
+
   const handleShareWorkout = async () => {
     if (!newPostTitle.trim()) {
       Alert.alert('Required', 'Please enter a title for your post.');
@@ -109,15 +134,53 @@ export default function CommunityScreen() {
     setNewPostTitle('');
     setNewPostContent('');
     setIsPosting(false);
-    Alert.alert('Celebration Shared', 'Your workout post is now visible in your self-hosted community feed.');
+
+    if (isAuthenticated) {
+      try {
+        const token = await getStoredAccessToken();
+        if (token) {
+          await fetch(`${backendUrl}/api/v1/community/posts`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              title: newPost.title,
+              content: newPost.content,
+            }),
+          });
+        }
+      } catch {
+        // Staged locally
+      }
+    }
+
+    Alert.alert('Celebration Shared', 'Your workout post is now visible in your community feed.');
   };
 
-  const handleLike = (postId: string) => {
+  const handleLike = async (postId: string) => {
     setPosts(
       posts.map((p) =>
         p.id === postId ? { ...p, likesCount: p.likesCount + 1 } : p
       )
     );
+
+    if (isAuthenticated) {
+      try {
+        const token = await getStoredAccessToken();
+        if (token) {
+          await fetch(`${backendUrl}/api/v1/community/posts/${postId}/like`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        }
+      } catch {
+        // Staged locally
+      }
+    }
   };
 
   return (

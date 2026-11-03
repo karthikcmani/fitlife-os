@@ -13,12 +13,12 @@ import {
   ActivityLevel,
   PrimaryGoal,
   TrainingEnvironment,
-} from '@fitlife/shared-types';
+} from '../src/types';
 import {
   calculateBmrMifflinStJeor,
   calculateTdee,
   calculateTargetCalories,
-} from '@fitlife/domain';
+} from '../src/domain';
 
 export default function OnboardingScreen() {
   const router = useRouter();

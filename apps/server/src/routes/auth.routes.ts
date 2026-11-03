@@ -21,7 +21,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
     try {
       const user = await AuthService.registerUser(parse.data);
-      const accessToken = fastify.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: '15m' });
+      const accessToken = fastify.jwt.sign({ sub: user.id, id: user.id, username: user.username }, { expiresIn: '15m' });
       const { token: refreshToken } = await AuthService.createRefreshToken(
         user.id,
         undefined,
@@ -29,6 +29,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       );
 
       return reply.status(201).send({
+        success: true,
         user,
         tokens: {
           accessToken,
@@ -57,7 +58,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
     try {
       const user = await AuthService.validateUserCredentials(parse.data);
-      const accessToken = fastify.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: '15m' });
+      const accessToken = fastify.jwt.sign({ sub: user.id, id: user.id, username: user.username }, { expiresIn: '15m' });
       const { token: refreshToken } = await AuthService.createRefreshToken(
         user.id,
         undefined,
@@ -65,6 +66,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       );
 
       return reply.send({
+        success: true,
         user,
         tokens: {
           accessToken,
@@ -102,7 +104,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.status(401).send({ error: 'USER_NOT_FOUND' });
       }
 
-      const accessToken = fastify.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: '15m' });
+      const accessToken = fastify.jwt.sign({ sub: user.id, id: user.id, username: user.username }, { expiresIn: '15m' });
 
       return reply.send({
         tokens: {

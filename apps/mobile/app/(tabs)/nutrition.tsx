@@ -8,7 +8,7 @@ import { Button } from '../../src/components/ui/Button';
 import { useNutritionStore } from '../../src/store/nutritionStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { theme } from '../../src/theme';
-import { Food, MealType } from '@fitlife/shared-types';
+import { Food, MealType } from '../../src/types';
 
 export default function NutritionScreen() {
   const { profile } = useAuthStore();

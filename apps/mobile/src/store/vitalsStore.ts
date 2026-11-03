@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Habit, SleepLog } from '@fitlife/shared-types';
+import { Habit, SleepLog } from '../types';
 import { getLocalDatabase } from '../db/sqlite';
 import { SyncManager } from '../services/syncManager';
 

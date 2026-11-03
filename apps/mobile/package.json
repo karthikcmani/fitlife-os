@@ -9,7 +9,8 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint ."
+    "lint": "oxlint .",
+    "test": "jest"
   },
   "dependencies": {
     "@fitlife/domain": "*",
@@ -28,7 +29,7 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "4.10.0",
+    "react-native-screens": "~4.30.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

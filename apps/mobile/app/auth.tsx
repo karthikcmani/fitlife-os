@@ -6,7 +6,7 @@ import { SurfaceCard } from '../src/components/ui/SurfaceCard';
 import { Button } from '../src/components/ui/Button';
 import { useAuthStore } from '../src/store/authStore';
 import { theme } from '../src/theme';
-import { registerSchema, loginSchema } from '@fitlife/validation';
+import { registerSchema, loginSchema } from '../src/validation';
 
 export default function AuthModalScreen() {
   const router = useRouter();

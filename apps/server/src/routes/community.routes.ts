@@ -28,11 +28,15 @@ export async function communityRoutes(fastify: FastifyInstance) {
   fastify.post('/posts', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       await request.jwtVerify();
-      const user = request.user as { id: string };
+      const user = request.user as { id?: string; sub?: string };
+      const userId = user.id || user.sub;
+      if (!userId) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
       const parsed = createPostSchema.parse(request.body);
 
       const post = await communityService.createPost({
-        userId: user.id,
+        userId,
         title: parsed.title,
         content: parsed.content,
         workoutSessionId: parsed.workoutSessionId,
@@ -51,8 +55,12 @@ export async function communityRoutes(fastify: FastifyInstance) {
   fastify.post('/posts/:id/like', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       await request.jwtVerify();
-      const user = request.user as { id: string };
-      const result = await communityService.toggleLike(request.params.id, user.id);
+      const user = request.user as { id?: string; sub?: string };
+      const userId = user.id || user.sub;
+      if (!userId) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
+      const result = await communityService.toggleLike(request.params.id, userId);
       return reply.send({ success: true, ...result });
     } catch (error) {
       return reply.status(401).send({ error: 'Unauthorized' });
@@ -63,11 +71,15 @@ export async function communityRoutes(fastify: FastifyInstance) {
   fastify.post('/posts/:id/comments', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       await request.jwtVerify();
-      const user = request.user as { id: string };
+      const user = request.user as { id?: string; sub?: string };
+      const userId = user.id || user.sub;
+      if (!userId) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
       const parsed = createCommentSchema.parse(request.body);
 
       const comment = await communityService.addComment({
-        userId: user.id,
+        userId,
         postId: request.params.id,
         content: parsed.content,
       });

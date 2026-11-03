@@ -17,13 +17,16 @@ module.exports = function withFDroidClean(config) {
     return cfg;
   });
 
-  // 2. Clean AndroidManifest.xml
+  // 2. Clean AndroidManifest.xml & enforce backup exclusion
   config = withAndroidManifest(config, (cfg) => {
     const app = cfg.modResults.manifest.application?.[0];
-    if (app && app.service) {
-      app.service = app.service.filter(
-        (s) => !s.$['android:name']?.includes('FirebaseMessagingService')
-      );
+    if (app) {
+      app.$['android:allowBackup'] = 'false';
+      if (app.service) {
+        app.service = app.service.filter(
+          (s) => !s.$['android:name']?.includes('FirebaseMessagingService')
+        );
+      }
     }
     return cfg;
   });

@@ -8,7 +8,7 @@ import { Button } from '../../src/components/ui/Button';
 import { useVitalsStore } from '../../src/store/vitalsStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { theme } from '../../src/theme';
-import { calculateRecoveryScore } from '@fitlife/domain';
+import { calculateRecoveryScore } from '../../src/domain';
 
 export default function VitalsScreen() {
   const { profile } = useAuthStore();

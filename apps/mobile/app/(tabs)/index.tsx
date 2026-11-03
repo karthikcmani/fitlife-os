@@ -19,7 +19,7 @@ import {
   calculateMacronutrients,
   calculateRecoveryScore,
   calculateTotalWorkoutVolume,
-} from '@fitlife/domain';
+} from '../../src/domain';
 
 export default function DashboardScreen() {
   const router = useRouter();

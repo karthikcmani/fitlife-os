@@ -63,6 +63,8 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="photo-vault" options={{ headerShown: false }} />
+        <Stack.Screen name="community" options={{ headerShown: false }} />
         <Stack.Screen
           name="auth"
           options={{ presentation: 'modal', title: 'Account & Synchronization' }}

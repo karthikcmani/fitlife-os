@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Food, Meal, MealType } from '@fitlife/shared-types';
+import { Food, Meal, MealType } from '../types';
 import { getLocalDatabase } from '../db/sqlite';
 import { SyncManager } from '../services/syncManager';
 

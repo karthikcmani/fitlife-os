@@ -37,7 +37,10 @@ export class SyncService {
       .executeTakeFirst();
 
     if (existing) {
-      return existing.response_payload as unknown as SyncPushBatchResponse;
+      const payload = typeof existing.response_payload === 'string' 
+        ? JSON.parse(existing.response_payload) 
+        : existing.response_payload;
+      return payload as SyncPushBatchResponse;
     }
 
     const serverHlc = this.generateServerHlc(clientHlc);
@@ -60,7 +63,7 @@ export class SyncService {
               operation: m.operation,
               client_timestamp: clientTimestamp,
               server_timestamp: serverTimestamp,
-              payload: m.payload,
+              payload: JSON.stringify(m.payload) as any,
             })
             .execute();
 
@@ -202,9 +205,16 @@ export class SyncService {
           batch_id: batchId,
           user_id: userId,
           status: 'COMMITTED',
-          response_payload: responsePayload as any,
+          response_payload: JSON.stringify(responsePayload) as any,
           expires_at: expiresAt,
         })
+        .onConflict((oc) =>
+          oc.column('batch_id').doUpdateSet({
+            status: 'COMMITTED',
+            response_payload: JSON.stringify(responsePayload) as any,
+            expires_at: expiresAt,
+          })
+        )
         .execute();
     });
 
