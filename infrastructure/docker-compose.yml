@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-fitlife}:${POSTGRES_PASSWORD:-fitlife_secure_password}@db:5432/${POSTGRES_DB:-fitlife_db}
+      - JWT_SECRET=${JWT_SECRET:-generate_a_random_jwt_secret_64_bytes}
+      - REFRESH_SECRET=${REFRESH_SECRET:-generate_a_random_refresh_secret_64_bytes}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-fitlife}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-fitlife_secure_password}
+      - POSTGRES_DB=${POSTGRES_DB:-fitlife_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fitlife} -d ${POSTGRES_DB:-fitlife_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:

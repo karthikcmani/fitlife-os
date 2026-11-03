@@ -1,0 +1,11 @@
+# Caddy Reverse Proxy Configuration for FITLIFE OS
+# Replace fitlife.example.com with your domain or use :80 for local LAN
+{$FITLIFE_DOMAIN:localhost} {
+    reverse_proxy api:4000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode zstd gzip
+}
