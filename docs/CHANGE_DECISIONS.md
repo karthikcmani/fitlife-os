@@ -59,8 +59,8 @@ Each decision entry must document:
 - **Status:** PROPOSED (Awaiting User Sign-off)
 - **Scope / Component:** Local Storage & Data Synchronization
 - **Previous Decision:** Unspecified offline storage.
-- **Proposed Decision:** Use **Expo SQLite** with Write-Ahead Logging (WAL) and an append-only **Sync Queue** leveraging Lamport timestamps and idempotent delta batch sync (`POST /api/v1/sync/push`, `GET /api/v1/sync/pull`).
-- **Justification:** Ensures instant UI response times ($\le 16\text{ ms}$) without waiting for network I/O, protects user data during connectivity drops, and prevents data loss.
+- **Proposed Decision:** Use **Expo SQLite** with Write-Ahead Logging (WAL) and an append-only **Sync Queue** leveraging **Hybrid Logical Clocks (HLC)**, idempotent batch mutations (`POST /api/v1/sync/push`), field-level Last-Write-Wins (LWW) for mutable entities, and soft-delete tombstone propagation.
+- **Justification:** Pure Lamport clocks cannot distinguish true concurrency from causality and ignore physical clock drift; HLC combines physical time with logical sequencing, preventing phantom overwrites and drift anomalies while maintaining $<16\text{ ms}$ local write performance.
 - **Approver:** Pending
 
 ---
@@ -72,4 +72,15 @@ Each decision entry must document:
 - **Previous Decision:** Unspecified push notifications.
 - **Proposed Decision:** Rely entirely on **local Android notifications and alarms** for personal health routines (workouts, hydration, habits, sleep). For optional server-triggered community events, support **UnifiedPush** (NextPush/ntfy) without requiring Google Cloud Messaging (FCM).
 - **Justification:** Google Play Services FCM violates pure F-Droid guidelines; local notifications provide 100% offline reliability with zero privacy leaks.
+- **Approver:** Pending
+
+---
+
+### DEC-2026-005: Nutrition Database Licensing & Ingestion Strategy
+- **Date:** 2026-11-03
+- **Status:** PROPOSED (Awaiting User Sign-off)
+- **Scope / Component:** Nutrition Subsystem (`foods` dataset)
+- **Previous Decision:** Bundle ICMR-NIN IFCT 2017 dataset directly.
+- **Proposed Decision:** Pre-seed local database with open-source licensed datasets: **Open Food Facts (ODbL)**, **USDA FoodData Central (CC0)**, and community-verified Indian composite recipes with household measure mappings (katori, roti, cup). Provide an optional personal CLI ingestion script (`tools/import-ifct-personal.ts`) for users wishing to import their personal licensed copy of IFCT 2017.
+- **Justification:** ICMR-NIN holds strict copyright on IFCT 2017 prohibiting unauthorized electronic distribution in products. Open Food Facts and USDA are legally unencumbered and FOSS-compliant.
 - **Approver:** Pending

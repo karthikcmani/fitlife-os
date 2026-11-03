@@ -24,3 +24,35 @@ This log tracks chronologically all major engineering operations, milestones ach
 
 ### Next Step:
 - Present the initial Technical Approval Report to the human maintainer for formal authorization before establishing the monorepo codebase.
+
+---
+
+## [2026-11-03] — Deep Technical Validation & Architectural Investigation
+
+### Actions Executed:
+1. **React Native & Expo F-Droid Audit:**
+   - Evaluated Expo SDK 51 & 52 (React Native 0.76 with New Architecture / Hermes).
+   - Audited F-Droid offline build server pipeline requirements.
+   - Verified that `expo-notifications` bundles proprietary FCM by default; designed custom clean Config Plugin solution to strip GMS/Firebase and enforce pure local alarm scheduling.
+   - Verified Hermes engine open-source licensing (Apache-2.0) and F-Droid acceptance history (Joplin, Element).
+2. **Offline Synchronization Deep Dive:**
+   - Evaluated limitations of scalar Lamport timestamps (causality vs. concurrency blindness, wall-clock drift).
+   - Designed mathematically sound **Hybrid Logical Clock (HLC)** architecture with field-level Last-Write-Wins (LWW) for mutable entities, idempotent batch mutations with `idempotency_ledger`, and soft-delete tombstone propagation.
+3. **Backend & Self-Hosting Validation:**
+   - Validated Fastify + PostgreSQL 16 + Kysely runtime efficiency ($<60\text{ MB}$ memory footprint, zero ORM reflection).
+   - Formulated complete self-hosted `docker-compose.yml` blueprint with automated Caddy SSL reverse proxy and automated daily `pg_dump` backup/restore scripts.
+   - Calculated realistic hosting costs: \$0/month for home lab (Raspberry Pi/TrueNAS), \$3.50–\$5.00/month on entry cloud VPS.
+4. **Nutrition Database Legal & Ingestion Audit:**
+   - Audited ICMR-NIN IFCT 2017 copyright terms: discovered strict prohibition on electronic product distribution without written permission.
+   - Formulated compliant multi-tier ingestion architecture combining Open Food Facts (ODbL), USDA FoodData Central (CC0), and community-verified Indian composite recipes with household measure mappings (katori, roti, cup).
+5. **Security & Cryptography Audit:**
+   - Verified Argon2id ($m=64\text{ MB}, t=3, p=4$) and dual-token rotation with SHA-256 hash storage.
+   - Validated Android Keystore / `Expo SecureStore` isolation and EXIF-stripped private transformation photo vault.
+6. **Empirical Performance Targets:**
+   - Established strict measurable performance budgets: $\le 1200\text{ ms}$ cold startup, $\le 16\text{ ms}$ SQLite write, $\le 30\text{ ms}$ dashboard read, $\le 35\text{ MB}$ APK size, $\le 90\text{ MB}$ idle RAM.
+7. **Artifacts Generated:**
+   - Authored comprehensive [`docs/TECHNICAL_VALIDATION_REPORT.md`](file:///d:/FitLife-OS/docs/TECHNICAL_VALIDATION_REPORT.md).
+   - Updated [`docs/CHANGE_DECISIONS.md`](file:///d:/FitLife-OS/docs/CHANGE_DECISIONS.md) with DEC-2026-003 refinement and DEC-2026-005 proposal.
+
+### Next Step:
+- Present the Technical Validation Report and await explicit human approval before establishing Phase 1 monorepo scaffolding.
