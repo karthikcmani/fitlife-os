@@ -58,6 +58,7 @@ describe('FITLIFE OS — Daily Fitness Guide Engine Tests', () => {
         fatConsumedG: 15,
       },
       todayWaterMl: 500,
+      currentHour: 10,
       hasWorkoutLoggedToday: false,
       consecutiveTrainingDays: 2, // Trained 2 days in a row!
       recentSleepDurationMinutes: 280, // Poor sleep (<5 hours)
@@ -105,6 +106,7 @@ describe('FITLIFE OS — Daily Fitness Guide Engine Tests', () => {
         fatConsumedG: 40,
       },
       todayWaterMl: 500,
+      currentHour: 10,
       hasWorkoutLoggedToday: false,
       consecutiveTrainingDays: 0,
       completedHabitsCount: 0,
@@ -194,6 +196,7 @@ describe('FITLIFE OS — Daily Fitness Guide Engine Tests', () => {
         fatConsumedG: 0,
       },
       todayWaterMl: 500,
+      currentHour: 10,
       hasWorkoutLoggedToday: false,
       isWorkoutInProgress: true,
       consecutiveTrainingDays: 0,

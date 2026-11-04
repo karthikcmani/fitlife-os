@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+        
+            <defs>
+                <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#A3E635"/>
+                    <stop offset="35%" stop-color="#22C55E"/>
+                    <stop offset="70%" stop-color="#14B8A6"/>
+                    <stop offset="100%" stop-color="#06B6D4"/>
+                </linearGradient>
+            </defs>
+            
+        
+        <path d="M 712.05 396.50 A 231.00 231.00 0 1 1 609.62 302.64" fill="none" stroke="url(#ringGrad)" stroke-width="29.4" stroke-linecap="round"/>
+        <path d="
+        M 412.6 526.0
+        C 409.1 484.0 440.6 442.0 482.6 431.5
+        C 514.1 431.5 528.1 452.5 542.1 435.0
+        C 563.1 424.5 587.6 421.0 608.6 435.0
+        C 612.1 466.5 598.1 515.5 601.6 561.0
+        C 591.1 592.5 559.6 596.0 521.1 582.0
+        C 468.6 571.5 430.1 554.0 412.6 526.0
+        Z
+        " fill="none" stroke="#FFFFFF" stroke-width="16.799999999999997" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="
+        M 489.6 435.0
+        C 510.6 473.5 531.6 501.5 559.6 512.0
+        " fill="none" stroke="#FFFFFF" stroke-width="12.599999999999998" stroke-linecap="round"/>
+    </svg>
