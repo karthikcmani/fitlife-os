@@ -111,8 +111,97 @@ describe('FITLIFE OS — Daily Fitness Guide Engine Tests', () => {
       totalHabitsCount: 1,
     });
 
-    expect(plan.hydration.conversationalStatus).toContain('Logged 0.5L of 2.5L');
-    expect(plan.hydration.suggestedSchedule).toContain('every 2 hours');
+    expect(plan.hydration.conversationalStatus).toContain('0.5L');
     expect(plan.hydration.whyThisIsSuggested).toBeDefined();
+  });
+
+  it('adjusts hydration and habit guidance based on the time of day', () => {
+    // 1. Morning (8 AM)
+    const morningPlan = generateDailyPlan({
+      profile: mockProfile,
+      nutrition: {
+        caloriesConsumed: 0,
+        targetCalories: 2000,
+        proteinConsumedG: 0,
+        targetProteinG: 140,
+        carbsConsumedG: 0,
+        fatConsumedG: 0,
+      },
+      todayWaterMl: 0,
+      hasWorkoutLoggedToday: false,
+      consecutiveTrainingDays: 0,
+      completedHabitsCount: 0,
+      totalHabitsCount: 1,
+      currentHour: 8,
+    });
+    expect(morningPlan.hydration.headline).toContain('Morning Hydration');
+    expect(morningPlan.habitFocus.title).toContain('Morning Habit');
+
+    // 2. Evening (7:31 PM = 19)
+    const eveningPlan = generateDailyPlan({
+      profile: mockProfile,
+      nutrition: {
+        caloriesConsumed: 1400,
+        targetCalories: 2000,
+        proteinConsumedG: 90,
+        targetProteinG: 140,
+        carbsConsumedG: 150,
+        fatConsumedG: 45,
+      },
+      todayWaterMl: 1200,
+      hasWorkoutLoggedToday: false,
+      consecutiveTrainingDays: 0,
+      completedHabitsCount: 0,
+      totalHabitsCount: 1,
+      currentHour: 19,
+    });
+    expect(eveningPlan.hydration.headline).toContain('Evening Hydration');
+    expect(eveningPlan.hydration.suggestedSchedule).toContain('taper off');
+    expect(eveningPlan.habitFocus.title).toContain('Evening Habit');
+
+    // 3. Night (10:30 PM = 22)
+    const nightPlan = generateDailyPlan({
+      profile: mockProfile,
+      nutrition: {
+        caloriesConsumed: 1900,
+        targetCalories: 2000,
+        proteinConsumedG: 130,
+        targetProteinG: 140,
+        carbsConsumedG: 200,
+        fatConsumedG: 50,
+      },
+      todayWaterMl: 1500,
+      hasWorkoutLoggedToday: true,
+      consecutiveTrainingDays: 1,
+      completedHabitsCount: 0,
+      totalHabitsCount: 1,
+      currentHour: 22,
+    });
+    expect(nightPlan.hydration.headline).toContain('Nighttime Hydration');
+    expect(nightPlan.hydration.conversationalStatus).toContain('Avoid forcing large amounts of water near bedtime');
+    expect(nightPlan.habitFocus.title).toContain('Night Habit');
+  });
+
+  it('correctly distinguishes workout in progress from completed workout', () => {
+    const inProgressPlan = generateDailyPlan({
+      profile: mockProfile,
+      nutrition: {
+        caloriesConsumed: 0,
+        targetCalories: 2000,
+        proteinConsumedG: 0,
+        targetProteinG: 140,
+        carbsConsumedG: 0,
+        fatConsumedG: 0,
+      },
+      todayWaterMl: 500,
+      hasWorkoutLoggedToday: false,
+      isWorkoutInProgress: true,
+      consecutiveTrainingDays: 0,
+      completedHabitsCount: 0,
+      totalHabitsCount: 1,
+    });
+    expect(inProgressPlan.workout.headline).toContain('Workout In Progress');
+    expect(inProgressPlan.workout.actionText).toContain('Resume Active Workout');
+    expect(inProgressPlan.nextBestAction.title).toContain('Resume Active Workout');
   });
 });

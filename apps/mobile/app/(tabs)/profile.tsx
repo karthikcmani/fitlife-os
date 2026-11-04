@@ -17,7 +17,7 @@ import { useAuthStore, getStoredAccessToken } from '../../src/store/authStore';
 import { SyncManager } from '../../src/services/syncManager';
 import { localNotificationManager, LocalNotificationSchedule } from '../../src/services/localNotifications';
 import { theme } from '../../src/theme';
-import { calculateBmrMifflinStJeor, calculateTdee } from '../../src/domain';
+import { calculateBmrMifflinStJeor, calculateTdee, calculateAgeFromDob } from '../../src/domain';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -122,9 +122,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const userAge = profile?.dateOfBirth
-    ? Math.max(13, new Date().getFullYear() - parseInt(profile.dateOfBirth.split('-')[0], 10))
-    : 25;
+  const userAge = profile?.dateOfBirth ? calculateAgeFromDob(profile.dateOfBirth) : 25;
 
   const bmr = profile
     ? calculateBmrMifflinStJeor({

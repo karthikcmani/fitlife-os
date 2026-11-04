@@ -30,6 +30,8 @@ import {
   getFriendlyAssistantAnswer,
   AssistantQuestionKey,
   AssistantAnswer,
+  getLocalDateString,
+  calculateAgeFromDob,
 } from '../../src/domain';
 
 export default function DashboardScreen() {
@@ -39,7 +41,7 @@ export default function DashboardScreen() {
   const { dailyTotals, loadTodayNutrition } = useNutritionStore();
   const { todayWaterMl, habits, completedHabitIds, recentSleep, loadVitals, addWater } = useVitalsStore();
 
-  const [dateStr] = useState(new Date().toISOString().split('T')[0]!);
+  const [dateStr] = useState(getLocalDateString());
   const [selectedQuestion, setSelectedQuestion] = useState<AssistantQuestionKey | null>(null);
   const [assistantModalVisible, setAssistantModalVisible] = useState(false);
   const [activeAnswer, setActiveAnswer] = useState<AssistantAnswer | null>(null);
@@ -52,9 +54,7 @@ export default function DashboardScreen() {
     loadVitals(userId, dateStr);
   }, [userId, dateStr]);
 
-  const userAge = profile?.dateOfBirth
-    ? Math.max(13, new Date().getFullYear() - parseInt(profile.dateOfBirth.split('-')[0], 10))
-    : 25;
+  const userAge = profile?.dateOfBirth ? calculateAgeFromDob(profile.dateOfBirth) : 25;
 
   // Physiological Target Calculations (Derived strictly from Profile)
   const bmr = profile
@@ -92,16 +92,23 @@ export default function DashboardScreen() {
       })
     : null;
 
-  // Today's total workout volume
-  const todaySession = recentSessions.find((s) => s.startedAt.startsWith(dateStr));
-  const todayVolume = todaySession?.sets
-    ? calculateTotalWorkoutVolume(todaySession.sets)
+  // Today's completed workout session (must have endedAt and completed sets)
+  const todayCompletedSession = recentSessions.find(
+    (s) => s.startedAt.startsWith(dateStr) && Boolean(s.endedAt) && s.sets && s.sets.some((st) => st.isCompleted)
+  );
+  const todayVolume = todayCompletedSession?.sets
+    ? calculateTotalWorkoutVolume(todayCompletedSession.sets)
     : 0;
 
-  // Calculate consecutive workout days
-  const yesterdayDate = new Date(Date.now() - 86400000).toISOString().split('T')[0]!;
-  const hasYesterdayWorkout = recentSessions.some((s) => s.startedAt.startsWith(yesterdayDate));
-  const consecutiveDays = (todaySession ? 1 : 0) + (hasYesterdayWorkout ? 1 : 0);
+  const isWorkoutInProgress = Boolean(activeSession);
+
+  // Calculate consecutive workout days based on actually completed workouts
+  const yesterday = new Date(Date.now() - 86400000);
+  const yesterdayDate = getLocalDateString(yesterday);
+  const hasYesterdayWorkout = recentSessions.some(
+    (s) => s.startedAt.startsWith(yesterdayDate) && Boolean(s.endedAt) && s.sets && s.sets.some((st) => st.isCompleted)
+  );
+  const consecutiveDays = (todayCompletedSession ? 1 : 0) + (hasYesterdayWorkout ? 1 : 0);
 
   // Generate Intelligent Daily Fitness Guide
   const dailyPlan = generateDailyPlan({
@@ -129,7 +136,8 @@ export default function DashboardScreen() {
       fatConsumedG: dailyTotals.fatG,
     },
     todayWaterMl,
-    hasWorkoutLoggedToday: Boolean(todaySession),
+    hasWorkoutLoggedToday: Boolean(todayCompletedSession),
+    isWorkoutInProgress,
     consecutiveTrainingDays: consecutiveDays,
     recentSleepDurationMinutes: recentSleep?.durationMinutes,
     recentSleepQuality: recentSleep?.subjectiveQuality,
@@ -333,15 +341,18 @@ export default function DashboardScreen() {
         {activeSession ? (
           <View style={styles.activeWorkoutBox}>
             <Text style={styles.activeWorkoutTitle}>In Progress: {activeSession.title}</Text>
+            <Text style={styles.bodyText}>
+              Started at {new Date(activeSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {activeSession.sets?.length ?? 0} sets recorded
+            </Text>
             <Button
-              title="Continue Workout"
+              title="Resume Active Workout"
               onPress={() => router.push('/(tabs)/workout')}
               style={styles.actionBtn}
             />
           </View>
-        ) : todaySession ? (
+        ) : todayCompletedSession ? (
           <View>
-            <Text style={styles.completedText}>Completed: {todaySession.title}</Text>
+            <Text style={styles.completedText}>Completed: {todayCompletedSession.title}</Text>
             <View style={styles.metricsRow}>
               <MetricChip
                 label="Volume"
@@ -349,18 +360,18 @@ export default function DashboardScreen() {
                 unit="kg"
                 accentColor={theme.colors.warning}
               />
-              <MetricChip label="Sets Logged" value={todaySession.sets?.length ?? 0} />
+              <MetricChip label="Sets Logged" value={todayCompletedSession.sets?.length ?? 0} />
             </View>
           </View>
         ) : (
           <View>
             <Text style={styles.emptyText}>
               {dailyPlan.workout.isRestDay
-                ? 'Active recovery day. Prioritize stretching and hydration.'
+                ? 'Active recovery day. Prioritize light mobility and hydration.'
                 : 'No workout logged yet today. Ready when you are!'}
             </Text>
             <Button
-              title="Open Workout Routine"
+              title={dailyPlan.workout.isRestDay ? "Log Gentle Recovery" : "Begin Scheduled Workout"}
               onPress={() => router.push('/(tabs)/workout')}
               variant="secondary"
               style={styles.actionBtn}
@@ -408,7 +419,7 @@ export default function DashboardScreen() {
       <SurfaceCard>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Sleep & Recovery Index</Text>
-          {recovery ? (
+          {recentSleep && recovery ? (
             <Text
               style={[
                 styles.recoveryBadge,
@@ -422,10 +433,10 @@ export default function DashboardScreen() {
           ) : null}
         </View>
 
-        {recovery ? (
+        {recentSleep && recovery ? (
           <View>
             <Text style={styles.bodyText}>
-              Duration: {recovery.durationHours} hours | Subjective Quality: {recentSleep?.subjectiveQuality}/5
+              Duration: {recovery.durationHours} hours | Subjective Quality: {recentSleep.subjectiveQuality}/5
             </Text>
             {recovery.recommendations.map((rec, i) => (
               <Text key={i} style={styles.recommendationText}>
@@ -435,7 +446,10 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View>
-            <Text style={styles.emptyText}>No sleep recorded for last night.</Text>
+            <Text style={styles.emptyText}>No sleep recorded yet.</Text>
+            <Text style={styles.emptySubtext}>
+              Not enough information to estimate recovery. Log your sleep in Vitals to see physiological readiness insights.
+            </Text>
             <Button
               title="Log Sleep"
               onPress={() => router.push('/(tabs)/vitals')}
@@ -680,6 +694,12 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textMuted,
     marginVertical: theme.spacing.sm,
+  },
+  emptySubtext: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.sm,
+    lineHeight: 18,
   },
   actionBtn: {
     marginTop: theme.spacing.sm,

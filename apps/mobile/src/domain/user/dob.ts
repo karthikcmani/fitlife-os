@@ -13,6 +13,17 @@ export interface DobValidationResult {
 }
 
 /**
+ * Returns a calendar date string in YYYY-MM-DD format using the user's LOCAL timezone.
+ * Avoids UTC offset day shifts (e.g. after midnight in non-GMT zones).
+ */
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Checks if a given year is a leap year in the Gregorian calendar.
  * Rule: Divisible by 4, but not by 100 unless also divisible by 400.
  */
@@ -156,4 +167,16 @@ export function parseAndValidateDob(
     isoDate: `${year}-${paddedMonth}-${paddedDay}`,
     formattedDob: `${paddedDay}/${paddedMonth}/${year}`,
   };
+}
+
+/**
+ * Calculates user's dynamic age in years from their stored date of birth string.
+ * Falls back to 25 if unparseable.
+ */
+export function calculateAgeFromDob(
+  dobString: string,
+  referenceDate: Date = new Date()
+): number {
+  const res = parseAndValidateDob(dobString, referenceDate);
+  return res.isValid && res.ageYears !== undefined ? res.ageYears : 25;
 }

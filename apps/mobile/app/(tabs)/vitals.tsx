@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { Header } from '../../src/components/ui/Header';
 import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
@@ -8,7 +8,7 @@ import { Button } from '../../src/components/ui/Button';
 import { useVitalsStore } from '../../src/store/vitalsStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { theme } from '../../src/theme';
-import { calculateRecoveryScore } from '../../src/domain';
+import { calculateRecoveryScore, getLocalDateString } from '../../src/domain';
 
 export default function VitalsScreen() {
   const { profile } = useAuthStore();
@@ -24,15 +24,16 @@ export default function VitalsScreen() {
     logSleep,
   } = useVitalsStore();
 
-  const [dateStr] = useState(new Date().toISOString().split('T')[0]!);
+  const [dateStr] = useState(getLocalDateString());
   const [newHabitTitle, setNewHabitTitle] = useState('');
 
-  // Sleep Logging State
-  const [sleepHours, setSleepHours] = useState('7.5');
-  const [sleepQuality, setSleepQuality] = useState<1 | 2 | 3 | 4 | 5>(4);
+  // Sleep Logging State — MUST NOT be pre-populated with fake data
+  const [sleepHours, setSleepHours] = useState('');
+  const [sleepQuality, setSleepQuality] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
+  const [showEditSleep, setShowEditSleep] = useState(false);
 
   const userId = profile?.userId ?? 'local_user';
-  const waterTarget = profile?.dailyWaterTargetMl ?? 3000;
+  const waterTarget = profile?.dailyWaterTargetMl ?? 2500;
 
   useEffect(() => {
     loadVitals(userId, dateStr);
@@ -45,9 +46,18 @@ export default function VitalsScreen() {
   };
 
   const handleLogSleep = async () => {
-    const hours = parseFloat(sleepHours) || 7.0;
-    const durationMinutes = Math.round(hours * 60);
+    const hours = parseFloat(sleepHours);
+    if (isNaN(hours) || hours <= 0 || hours > 24) {
+      Alert.alert('Invalid Duration', 'Please enter a valid sleep duration between 0.5 and 24 hours (e.g. 7.5).');
+      return;
+    }
 
+    if (!sleepQuality) {
+      Alert.alert('Quality Rating Required', 'Please select how restful your sleep felt (rating 1 to 5).');
+      return;
+    }
+
+    const durationMinutes = Math.round(hours * 60);
     const now = new Date();
     const bedtime = new Date(now.getTime() - durationMinutes * 60000).toISOString();
 
@@ -59,6 +69,11 @@ export default function VitalsScreen() {
       subjectiveQuality: sleepQuality,
       notes: 'Logged via FITLIFE OS Vitals Tracker',
     });
+
+    setSleepHours('');
+    setSleepQuality(null);
+    setShowEditSleep(false);
+    Alert.alert('Sleep Saved', `Recorded ${hours} hours of sleep with quality ${sleepQuality}/5.`);
   };
 
   const recovery = recentSleep
@@ -189,70 +204,122 @@ export default function VitalsScreen() {
       <SurfaceCard>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Sleep & Recovery Insight</Text>
-          {recovery ? (
+          {recentSleep && recovery ? (
             <Text style={styles.recoveryBadge}>
               Score: {recovery.score}/100 ({recovery.rating.toUpperCase()})
             </Text>
-          ) : null}
+          ) : (
+            <Text style={styles.recoveryUnavailableBadge}>Recovery Unavailable</Text>
+          )}
         </View>
 
         <Text style={styles.sleepGuideText}>
           Target: 7-9 hours nightly allows optimal muscle tissue repair and hormonal balance. FITLIFE OS calculates wellness readiness estimates; not intended for medical diagnosis.
         </Text>
 
-        <View style={styles.sleepInputRow}>
-          <View style={styles.sleepCol}>
-            <Text style={styles.inputLabel}>Sleep Duration (Hours):</Text>
-            <TextInput
-              style={styles.textInput}
-              value={sleepHours}
-              onChangeText={setSleepHours}
-              keyboardType="numeric"
+        {recentSleep ? (
+          /* Actual Saved Sleep Record */
+          <View style={styles.savedRecordContainer}>
+            <View style={styles.savedRecordRow}>
+              <View>
+                <Text style={styles.savedRecordLabel}>Recorded Sleep Duration:</Text>
+                <Text style={styles.savedRecordValue}>
+                  {(recentSleep.durationMinutes / 60).toFixed(1)} hours
+                </Text>
+              </View>
+              <View>
+                <Text style={styles.savedRecordLabel}>Quality Rating:</Text>
+                <Text style={styles.savedRecordValue}>{recentSleep.subjectiveQuality} / 5</Text>
+              </View>
+            </View>
+
+            {recovery ? (
+              <View style={styles.feedbackBox}>
+                <Text style={styles.feedbackTitle}>Coach Recovery Guidance:</Text>
+                {recovery.recommendations.map((rec, idx) => (
+                  <Text key={idx} style={styles.feedbackText}>
+                    • {rec}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
+            <Button
+              title={showEditSleep ? 'Cancel Editing' : 'Update Sleep Record'}
+              variant="outline"
+              onPress={() => {
+                if (!showEditSleep) {
+                  setSleepHours((recentSleep.durationMinutes / 60).toString());
+                  setSleepQuality(recentSleep.subjectiveQuality as any);
+                }
+                setShowEditSleep(!showEditSleep);
+              }}
+              style={styles.editToggleBtn}
             />
           </View>
+        ) : (
+          /* Empty State: No Record */
+          <View style={styles.emptySleepBox}>
+            <Text style={styles.emptySleepTitle}>No sleep recorded yet.</Text>
+            <Text style={styles.emptySleepSub}>
+              Not enough information to estimate recovery. Log your actual sleep duration and quality below to see physiological readiness recommendations.
+            </Text>
+          </View>
+        )}
 
-          <View style={styles.sleepCol}>
-            <Text style={styles.inputLabel}>Quality (1 - 5):</Text>
-            <View style={styles.qualityRow}>
-              {([1, 2, 3, 4, 5] as const).map((q) => (
-                <TouchableOpacity
-                  key={q}
-                  style={[
-                    styles.qualityBtn,
-                    sleepQuality === q && styles.activeQualityBtn,
-                  ]}
-                  onPress={() => setSleepQuality(q)}
-                >
-                  <Text
-                    style={[
-                      styles.qualityText,
-                      sleepQuality === q && styles.activeQualityText,
-                    ]}
-                  >
-                    {q}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        {/* Input Form: Shown either when no record exists, or user clicked Update */}
+        {(!recentSleep || showEditSleep) && (
+          <View style={styles.sleepFormBox}>
+            <Text style={styles.formSectionTitle}>
+              {recentSleep ? 'Edit Sleep Record:' : 'Log Last Night’s Sleep:'}
+            </Text>
+
+            <View style={styles.sleepInputRow}>
+              <View style={styles.sleepCol}>
+                <Text style={styles.inputLabel}>Sleep Duration (Hours):</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={sleepHours}
+                  onChangeText={setSleepHours}
+                  keyboardType="numeric"
+                  placeholder="e.g. 7.5"
+                  placeholderTextColor={theme.colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.sleepCol}>
+                <Text style={styles.inputLabel}>Quality (1 - 5):</Text>
+                <View style={styles.qualityRow}>
+                  {([1, 2, 3, 4, 5] as const).map((q) => (
+                    <TouchableOpacity
+                      key={q}
+                      style={[
+                        styles.qualityBtn,
+                        sleepQuality === q && styles.activeQualityBtn,
+                      ]}
+                      onPress={() => setSleepQuality(q)}
+                    >
+                      <Text
+                        style={[
+                          styles.qualityText,
+                          sleepQuality === q && styles.activeQualityText,
+                        ]}
+                      >
+                        {q}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
 
-        <Button
-          title="Save Sleep Record"
-          onPress={handleLogSleep}
-          style={styles.sleepSaveBtn}
-        />
-
-        {recovery ? (
-          <View style={styles.feedbackBox}>
-            <Text style={styles.feedbackTitle}>Coach Recovery Guidance:</Text>
-            {recovery.recommendations.map((rec, idx) => (
-              <Text key={idx} style={styles.feedbackText}>
-                • {rec}
-              </Text>
-            ))}
+            <Button
+              title={recentSleep ? 'Save Updated Sleep Record' : 'Save Sleep Record'}
+              onPress={handleLogSleep}
+              style={styles.sleepSaveBtn}
+            />
           </View>
-        ) : null}
+        )}
       </SurfaceCard>
     </ScreenContainer>
   );
@@ -436,6 +503,66 @@ const styles = StyleSheet.create({
   recoveryBadge: {
     ...theme.typography.captionBold,
     color: theme.colors.primary,
+  },
+  recoveryUnavailableBadge: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textMuted,
+    backgroundColor: theme.colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+  },
+  savedRecordContainer: {
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  savedRecordRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  savedRecordLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  savedRecordValue: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+    marginTop: 2,
+  },
+  editToggleBtn: {
+    marginTop: theme.spacing.xs,
+  },
+  emptySleepBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.md,
+  },
+  emptySleepTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptySleepSub: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    lineHeight: 18,
+  },
+  sleepFormBox: {
+    backgroundColor: theme.colors.surface,
+    paddingTop: theme.spacing.sm,
+  },
+  formSectionTitle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.secondary,
+    marginBottom: theme.spacing.sm,
   },
   feedbackBox: {
     backgroundColor: theme.colors.surfaceElevated,

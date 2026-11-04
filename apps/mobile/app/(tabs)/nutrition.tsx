@@ -15,6 +15,7 @@ import {
   calculateTdee,
   calculateTargetCalories,
   parseAndValidateDob,
+  getLocalDateString,
 } from '../../src/domain';
 
 export default function NutritionScreen() {
@@ -32,8 +33,9 @@ export default function NutritionScreen() {
   const [selectedMealType, setSelectedMealType] = useState<MealType>('breakfast');
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [servingQuantity, setServingQuantity] = useState('1.0');
-  const [dateStr] = useState(new Date().toISOString().split('T')[0]!);
+  const [dateStr] = useState(getLocalDateString());
   const [showMacroInfo, setShowMacroInfo] = useState(false);
+  const [showCalculationDetails, setShowCalculationDetails] = useState(false);
 
   const userId = profile?.userId ?? 'local_user';
 
@@ -155,6 +157,32 @@ export default function NutritionScreen() {
             <Text style={styles.explainerItem}>
               <Text style={{ fontWeight: '700', color: theme.colors.accent }}>Fiber: </Text>
               Aids digestion, gut health, and stabilizes blood sugar.
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.calcToggleBtn}
+          onPress={() => setShowCalculationDetails(!showCalculationDetails)}
+        >
+          <Text style={styles.calcToggleText}>
+            {showCalculationDetails ? '▲ Hide Target Calculation' : '🔬 How was my target calculated?'}
+          </Text>
+        </TouchableOpacity>
+
+        {showCalculationDetails && (
+          <View style={styles.calculationDetailBox}>
+            <Text style={styles.calcDetailTitle}>Mathematical Target Breakdown</Text>
+            <Text style={styles.calcDetailItem}>• <Text style={{ fontWeight: '700' }}>Your Inputs:</Text> Weight: {userWeight}kg, Height: {userHeight}cm, Age: {userAge} yrs, Sex: {userGender}, Activity: {userActivity.replace('_', ' ')}</Text>
+            <Text style={styles.calcDetailItem}>• <Text style={{ fontWeight: '700' }}>Basal Metabolic Rate (BMR):</Text> {bmr} kcal/day (energy expended at complete rest via Mifflin-St Jeor)</Text>
+            <Text style={styles.calcDetailItem}>• <Text style={{ fontWeight: '700' }}>Total Daily Energy (TDEE):</Text> {tdee} kcal/day (BMR × activity multiplier)</Text>
+            <Text style={styles.calcDetailItem}>• <Text style={{ fontWeight: '700' }}>Goal Calibration ({userGoal.replace('_', ' ')}):</Text> {targetCalories} kcal/day ({targetCalResult.adjustmentPercentage > 0 ? '+' : ''}{Math.round(targetCalResult.adjustmentPercentage * 100)}% adjustment)</Text>
+            <Text style={styles.calcDetailItem}>• <Text style={{ fontWeight: '700' }}>Macro Calorie Math:</Text> {targetProtein}g P ({targetProtein * 4} kcal) + {targetCarbs}g C ({targetCarbs * 4} kcal) + {targetFat}g F ({targetFat * 9} kcal) = {targetProtein * 4 + targetCarbs * 4 + targetFat * 9} kcal</Text>
+            {targetCalResult.isCappedForSafety ? (
+              <Text style={styles.calcWarningText}>⚠️ Safety Cap: Clamped to physiological minimum floor to avoid metabolic suppression.</Text>
+            ) : null}
+            <Text style={styles.calcDisclaimer}>
+              Non-medical wellness estimate derived from clinical equations. Not intended for disease diagnosis or medical prescription.
             </Text>
           </View>
         )}
@@ -432,6 +460,45 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
     lineHeight: 18,
+  },
+  calcToggleBtn: {
+    paddingVertical: 4,
+    marginBottom: theme.spacing.sm,
+  },
+  calcToggleText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.secondary,
+  },
+  calculationDetailBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.md,
+    gap: 6,
+  },
+  calcDetailTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.secondary,
+    marginBottom: 4,
+  },
+  calcDetailItem: {
+    ...theme.typography.caption,
+    color: theme.colors.textPrimary,
+    lineHeight: 18,
+  },
+  calcWarningText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.warning,
+    marginTop: 2,
+  },
+  calcDisclaimer: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
+    marginTop: 4,
+    lineHeight: 16,
   },
   quickRow: {
     flexDirection: 'row',

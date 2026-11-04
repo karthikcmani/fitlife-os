@@ -9,6 +9,47 @@ import { useAuthStore } from '../../src/store/authStore';
 import { theme } from '../../src/theme';
 import { estimate1RmBrzycki } from '../../src/domain';
 
+function getInitialWorkoutDefaults(profile: any) {
+  const env = profile?.trainingEnvironment || 'gym';
+  const level = profile?.fitnessLevel || 'beginner';
+
+  if (env === 'calisthenics') {
+    return {
+      title: 'Bodyweight Movement & Core Foundation',
+      exerciseId: 'push-ups',
+      weight: '0',
+      reps: '10',
+      difficulty: 'beginner',
+    };
+  }
+  if (env === 'home') {
+    return {
+      title: 'Home Full-Body Circuit (Dumbbell & Bodyweight)',
+      exerciseId: 'goblet-squat',
+      weight: '10',
+      reps: '10',
+      difficulty: 'beginner',
+    };
+  }
+  // Gym
+  if (level === 'beginner') {
+    return {
+      title: 'Beginner Full-Body Foundation (Machine & Dumbbell)',
+      exerciseId: 'lat-pulldown',
+      weight: '25',
+      reps: '10',
+      difficulty: 'beginner',
+    };
+  }
+  return {
+    title: 'Upper Body Strength Progression',
+    exerciseId: 'barbell-bench-press',
+    weight: '50',
+    reps: '8',
+    difficulty: 'all',
+  };
+}
+
 export default function WorkoutScreen() {
   const { profile } = useAuthStore();
   const {
@@ -24,25 +65,40 @@ export default function WorkoutScreen() {
     cancelWorkout,
   } = useWorkoutStore();
 
+  const initialDefaults = getInitialWorkoutDefaults(profile);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState('all');
-  const [workoutTitle, setWorkoutTitle] = useState('Push Day (Chest / Shoulders / Triceps)');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>(initialDefaults.difficulty);
+  const [workoutTitle, setWorkoutTitle] = useState(initialDefaults.title);
+  const [hasUserEditedDefaults, setHasUserEditedDefaults] = useState(false);
 
   // Set Logging State
-  const [selectedExerciseId, setSelectedExerciseId] = useState<string>('barbell-bench-press');
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string>(initialDefaults.exerciseId);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showWarmupGuide, setShowWarmupGuide] = useState(false);
   const [showCooldownGuide, setShowCooldownGuide] = useState(false);
-  const [inputWeight, setInputWeight] = useState('60');
-  const [inputReps, setInputReps] = useState('8');
+  const [inputWeight, setInputWeight] = useState(initialDefaults.weight);
+  const [inputReps, setInputReps] = useState(initialDefaults.reps);
   const [inputRpe, setInputRpe] = useState('8');
 
   const userId = profile?.userId ?? 'local_user';
 
   useEffect(() => {
-    loadExercises(searchQuery, selectedMuscle);
+    if (profile && !hasUserEditedDefaults && !activeSession) {
+      const defaults = getInitialWorkoutDefaults(profile);
+      setWorkoutTitle(defaults.title);
+      setSelectedExerciseId(defaults.exerciseId);
+      setInputWeight(defaults.weight);
+      setInputReps(defaults.reps);
+      setSelectedDifficulty(defaults.difficulty);
+    }
+  }, [profile?.trainingEnvironment, profile?.fitnessLevel, activeSession]);
+
+  useEffect(() => {
+    loadExercises(searchQuery, selectedMuscle, selectedDifficulty);
     loadRecentSessions();
-  }, [searchQuery, selectedMuscle]);
+  }, [searchQuery, selectedMuscle, selectedDifficulty]);
 
   const handleStartWorkout = async () => {
     await startWorkout(workoutTitle, userId);
@@ -287,12 +343,24 @@ export default function WorkoutScreen() {
         /* WORKOUT PLANNING & START MODE */
         <View>
           <SurfaceCard elevated>
-            <Text style={styles.sectionHeading}>Start Scheduled Session</Text>
+            <View style={styles.routineHeaderWrap}>
+              <Text style={styles.sectionHeading}>Start Scheduled Session</Text>
+              {profile ? (
+                <View style={styles.tailoredPill}>
+                  <Text style={styles.tailoredPillText}>
+                    ✨ Tailored for {profile.fitnessLevel ? profile.fitnessLevel.charAt(0).toUpperCase() + profile.fitnessLevel.slice(1) : 'Beginner'} • {profile.trainingEnvironment ?? 'Home'}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={styles.inputLabel}>Workout Routine Title</Text>
             <TextInput
               style={styles.textInputFull}
               value={workoutTitle}
-              onChangeText={setWorkoutTitle}
+              onChangeText={(text) => {
+                setWorkoutTitle(text);
+                setHasUserEditedDefaults(true);
+              }}
               placeholder="e.g. Upper Body Strength A"
               placeholderTextColor={theme.colors.textMuted}
             />
@@ -315,6 +383,7 @@ export default function WorkoutScreen() {
             />
 
             {/* Muscle Filter Chips */}
+            <Text style={styles.filterGroupLabel}>TARGET MUSCLE</Text>
             <View style={styles.filterRow}>
               {['all', 'chest', 'back', 'quadriceps', 'shoulders', 'biceps'].map((m) => (
                 <TouchableOpacity
@@ -337,6 +406,30 @@ export default function WorkoutScreen() {
               ))}
             </View>
 
+            {/* Difficulty Filter Chips */}
+            <Text style={styles.filterGroupLabel}>DIFFICULTY / LEVEL</Text>
+            <View style={styles.filterRow}>
+              {['all', 'beginner', 'intermediate', 'advanced'].map((lvl) => (
+                <TouchableOpacity
+                  key={lvl}
+                  style={[
+                    styles.filterChip,
+                    selectedDifficulty === lvl && styles.activeFilterChip,
+                  ]}
+                  onPress={() => setSelectedDifficulty(lvl)}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      selectedDifficulty === lvl && styles.activeFilterText,
+                    ]}
+                  >
+                    {lvl === 'all' ? 'ALL LEVELS' : lvl.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <View style={styles.exerciseList}>
               {exercises.slice(0, 8).map((ex) => (
                 <TouchableOpacity
@@ -345,7 +438,13 @@ export default function WorkoutScreen() {
                     styles.exerciseItem,
                     selectedExerciseId === ex.id && styles.selectedExerciseItem,
                   ]}
-                  onPress={() => setSelectedExerciseId(ex.id)}
+                  onPress={() => {
+                    setSelectedExerciseId(ex.id);
+                    setHasUserEditedDefaults(true);
+                    if (ex.category === 'bodyweight' || ex.equipmentRequired?.toLowerCase().includes('bodyweight')) {
+                      setInputWeight('0');
+                    }
+                  }}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.exName}>{ex.name}</Text>
@@ -595,11 +694,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: theme.spacing.sm,
   },
+  routineHeaderWrap: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tailoredPill: {
+    backgroundColor: theme.colors.primaryDark ?? '#1b4332',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.borderRadius.full,
+  },
+  tailoredPillText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+    fontSize: 10,
+  },
+  filterGroupLabel: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    marginTop: 4,
+    marginBottom: 4,
+  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   filterChip: {
     paddingHorizontal: 10,

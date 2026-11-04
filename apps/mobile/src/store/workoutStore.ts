@@ -12,7 +12,7 @@ interface WorkoutState {
   isLoading: boolean;
 
   // Actions
-  loadExercises: (search?: string, muscleGroup?: string) => Promise<void>;
+  loadExercises: (search?: string, muscleGroup?: string, difficulty?: string) => Promise<void>;
   loadRecentSessions: () => Promise<void>;
   startWorkout: (title: string, userId: string) => Promise<void>;
   addSetToActive: (exerciseId: string, weightKg: number, reps: number, rpe?: number) => Promise<void>;
@@ -27,7 +27,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   activeSets: [],
   isLoading: false,
 
-  loadExercises: async (search, muscleGroup) => {
+  loadExercises: async (search, muscleGroup, difficulty) => {
     set({ isLoading: true });
     const db = await getLocalDatabase();
 
@@ -42,6 +42,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     if (muscleGroup && muscleGroup !== 'all') {
       query += ` AND primary_muscle_group = ?`;
       params.push(muscleGroup);
+    }
+
+    if (difficulty && difficulty !== 'all') {
+      query += ` AND difficulty = ?`;
+      params.push(difficulty);
     }
 
     query += ` ORDER BY name ASC LIMIT 100;`;
@@ -74,14 +79,64 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   loadRecentSessions: async () => {
     const db = await getLocalDatabase();
+
+    // 1. Clean up stale unended sessions older than 24 hours
+    await db.runAsync(
+      `UPDATE workout_sessions SET is_deleted = 1 WHERE ended_at IS NULL AND is_deleted = 0 AND datetime(started_at) < datetime('now', '-1 day');`
+    );
+
+    // 2. Check for an active in-progress session (started recently, not ended, not deleted)
+    if (!get().activeSession) {
+      const activeRow = await db.getFirstAsync<any>(
+        `SELECT * FROM workout_sessions WHERE ended_at IS NULL AND is_deleted = 0 ORDER BY started_at DESC LIMIT 1;`
+      );
+
+      if (activeRow) {
+        const setRows = await db.getAllAsync<any>(
+          `SELECT * FROM workout_sets WHERE workout_session_id = ? AND is_deleted = 0 ORDER BY set_index ASC;`,
+          [activeRow.id]
+        );
+
+        const restoredSession: WorkoutSession = {
+          id: activeRow.id,
+          userId: activeRow.user_id,
+          title: activeRow.title,
+          startedAt: activeRow.started_at,
+          endedAt: activeRow.ended_at,
+          notes: activeRow.notes,
+          clientCreatedAt: activeRow.client_created_at,
+          clientUpdatedAt: activeRow.client_updated_at,
+          isDeleted: Boolean(activeRow.is_deleted),
+          sets: setRows.map((s) => ({
+            id: s.id,
+            workoutSessionId: s.workout_session_id,
+            exerciseId: s.exercise_id,
+            setIndex: s.set_index,
+            setType: s.set_type,
+            weightKg: s.weight_kg,
+            reps: s.reps,
+            rpe: s.rpe,
+            isCompleted: Boolean(s.is_completed),
+            createdAt: s.created_at,
+          })),
+        };
+
+        set({
+          activeSession: restoredSession,
+          activeSets: restoredSession.sets ?? [],
+        });
+      }
+    }
+
+    // 3. Load completed sessions for history
     const rows = await db.getAllAsync<any>(
-      `SELECT * FROM workout_sessions WHERE is_deleted = 0 ORDER BY started_at DESC LIMIT 10;`
+      `SELECT * FROM workout_sessions WHERE is_deleted = 0 AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT 10;`
     );
 
     const sessions: WorkoutSession[] = [];
     for (const r of rows) {
       const sets = await db.getAllAsync<any>(
-        `SELECT * FROM workout_sets WHERE workout_session_id = ? ORDER BY set_index ASC;`,
+        `SELECT * FROM workout_sets WHERE workout_session_id = ? AND is_deleted = 0 ORDER BY set_index ASC;`,
         [r.id]
       );
 
@@ -215,7 +270,24 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     await get().loadRecentSessions();
   },
 
-  cancelWorkout: () => {
+  cancelWorkout: async () => {
+    const active = get().activeSession;
+    if (active) {
+      const db = await getLocalDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync(
+        `UPDATE workout_sessions SET is_deleted = 1, client_updated_at = ? WHERE id = ?;`,
+        [now, active.id]
+      );
+      await db.runAsync(
+        `DELETE FROM workout_sets WHERE workout_session_id = ?;`,
+        [active.id]
+      );
+      await SyncManager.enqueueMutation('workout_sessions', active.id, 'DELETE', {
+        id: active.id,
+      });
+    }
     set({ activeSession: null, activeSets: [] });
+    await get().loadRecentSessions();
   },
 }));
