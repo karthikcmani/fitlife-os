@@ -3,6 +3,7 @@ export const darkColors = {
   background: '#121212',
   surface: '#1E1E1E',
   surfaceElevated: '#282828',
+  surfaceHighlight: '#323232',
   border: '#2C2C2C',
   borderLight: '#3D3D3D',
 
@@ -15,6 +16,7 @@ export const darkColors = {
   danger: '#EF4444', // Crimson (Failure / Delete)
 
   // Typography
+  text: '#FFFFFF',
   textPrimary: '#FFFFFF',
   textSecondary: '#A1A1AA', // Zinc 400
   textMuted: '#71717A', // Zinc 500
@@ -30,6 +32,7 @@ export const lightColors = {
   background: '#F8FAFC',
   surface: '#FFFFFF',
   surfaceElevated: '#F1F5F9',
+  surfaceHighlight: '#E2E8F0',
   border: '#E2E8F0',
   borderLight: '#CBD5E1',
 
@@ -42,6 +45,7 @@ export const lightColors = {
   danger: '#DC2626',
 
   // Typography
+  text: '#0F172A',
   textPrimary: '#0F172A',
   textSecondary: '#475569',
   textMuted: '#94A3B8',

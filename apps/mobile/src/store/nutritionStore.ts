@@ -25,6 +25,16 @@ interface NutritionState {
     servings: number;
     dateStr: string;
   }) => Promise<void>;
+  logQuickMeal: (params: {
+    userId: string;
+    mealType: MealType;
+    title: string;
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+    dateStr: string;
+  }) => Promise<void>;
 }
 
 export const useNutritionStore = create<NutritionState>((set, get) => ({
@@ -188,6 +198,43 @@ export const useNutritionStore = create<NutritionState>((set, get) => ({
       calculatedCarbsG: calcCarbs,
       calculatedFatG: calcFat,
     });
+
+    await get().loadTodayNutrition(userId, dateStr);
+  },
+
+  logQuickMeal: async ({ userId, mealType, title, calories, proteinG, carbsG, fatG, dateStr }) => {
+    const db = await getLocalDatabase();
+    const now = new Date().toISOString();
+
+    let meal = await db.getFirstAsync<any>(
+      `SELECT id FROM meals WHERE user_id = ? AND logged_date = ? AND meal_type = ? AND is_deleted = 0;`,
+      [userId, dateStr, mealType]
+    );
+
+    let mealId = meal?.id;
+    if (!mealId) {
+      mealId = `meal-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      await db.runAsync(
+        `INSERT INTO meals (id, user_id, meal_type, logged_date, client_created_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?, 0);`,
+        [mealId, userId, mealType, dateStr, now]
+      );
+    }
+
+    // Check if food exists, or insert placeholder
+    const foodId = `food-quick-${title.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    await db.runAsync(
+      `INSERT OR IGNORE INTO foods (id, name, serving_size_g, serving_unit, calories, protein_g, carbs_g, fat_g, fiber_g, is_verified, created_at, updated_at)
+       VALUES (?, ?, 100, 'portion', ?, ?, ?, ?, 2, 1, ?, ?);`,
+      [foodId, title, calories, proteinG, carbsG, fatG, now, now]
+    );
+
+    const itemId = `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    await db.runAsync(
+      `INSERT INTO meal_items (id, meal_id, food_id, servings, grams_consumed, calculated_calories, calculated_protein_g, calculated_carbs_g, calculated_fat_g)
+       VALUES (?, ?, ?, 1, 100, ?, ?, ?, ?);`,
+      [itemId, mealId, foodId, calories, proteinG, carbsG, fatG]
+    );
 
     await get().loadTodayNutrition(userId, dateStr);
   },

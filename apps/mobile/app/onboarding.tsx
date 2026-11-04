@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../src/components/ui/ScreenContainer';
@@ -13,6 +14,7 @@ import { Header } from '../src/components/ui/Header';
 import { SurfaceCard } from '../src/components/ui/SurfaceCard';
 import { Button } from '../src/components/ui/Button';
 import { useAuthStore } from '../src/store/authStore';
+import { useCoachStore } from '../src/store/coachStore';
 import { theme } from '../src/theme';
 import {
   Gender,
@@ -20,617 +22,682 @@ import {
   ActivityLevel,
   PrimaryGoal,
   TrainingEnvironment,
+  EquipmentItem,
+  SessionDurationMinutes,
+  DietaryPreference,
+  PhysicalLimitation,
+  PersonalCoachingPlan,
 } from '../src/types';
-import {
-  calculateBmrMifflinStJeor,
-  calculateTdee,
-  calculateTargetCalories,
-  parseAndValidateDob,
-} from '../src/domain';
+import { parseAndValidateDob } from '../src/domain';
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { profile, setProfile } = useAuthStore();
+  const { generateAndSetPlan, saveAndActivatePlan } = useCoachStore();
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Wizard Steps: 1: Basic Info, 2: Goal, 3: Experience & Time, 4: Environment & Equipment, 5: Lifestyle & Limitations, 6: Plan Review
+  const [currentStep, setCurrentStep] = useState<number>(1);
 
-  // Step 1: Personal Biometrics (Empty defaults for new users, prefilled if recalibrating)
+  // Step 1: Basic Information
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [dobInput, setDobInput] = useState(() => {
     if (!profile?.dateOfBirth) return '';
     const parts = profile.dateOfBirth.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
-    }
-    return profile.dateOfBirth;
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : profile.dateOfBirth;
   });
   const [heightCm, setHeightCm] = useState(profile ? String(profile.heightCm) : '');
   const [weightKg, setWeightKg] = useState(profile ? String(profile.currentWeightKg) : '');
   const [gender, setGender] = useState<Gender | null>(profile?.gender ?? null);
+  const [waistCm, setWaistCm] = useState(profile?.bodyMeasurements?.waistCm ? String(profile.bodyMeasurements.waistCm) : '');
 
-  // Step 2: Experience, Activity & Schedule
-  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>(profile?.fitnessLevel ?? 'beginner');
-  const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(profile?.activityLevel ?? 'moderate');
-  const [trainingDays, setTrainingDays] = useState<number>(profile?.availableTrainingDays ?? 3);
-  const [trainingEnv, setTrainingEnv] = useState<TrainingEnvironment>(profile?.trainingEnvironment ?? 'gym');
-
-  // Step 3: Goal
+  // Step 2: Goal
   const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoal>(profile?.primaryGoal ?? 'general_fitness');
 
-  // Validation errors
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
+  // Step 3: Experience & Schedule
+  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>(profile?.fitnessLevel ?? 'beginner');
+  const [availableDays, setAvailableDays] = useState<number>(profile?.availableTrainingDays ?? 3);
+  const [sessionMinutes, setSessionMinutes] = useState<SessionDurationMinutes>(profile?.sessionDurationMinutes ?? 30);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile?.activityLevel ?? 'moderate');
 
-  // Dynamic live age calculation from DOB
+  // Step 4: Environment & Equipment
+  const [trainingEnv, setTrainingEnv] = useState<TrainingEnvironment>(profile?.trainingEnvironment ?? 'home');
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentItem[]>(
+    profile?.equipmentInventory && profile.equipmentInventory.length > 0
+      ? profile.equipmentInventory
+      : ['none']
+  );
+
+  // Step 5: Lifestyle & Limitations
+  const [dietaryPref, setDietaryPref] = useState<DietaryPreference>(profile?.dietaryPreference ?? 'vegetarian');
+  const [selectedLimitations, setSelectedLimitations] = useState<PhysicalLimitation[]>(
+    profile?.injuriesOrLimitations && profile.injuriesOrLimitations.length > 0
+      ? profile.injuriesOrLimitations
+      : ['none']
+  );
+
+  // Step 6: Plan Review state
+  const [generatedPlan, setGeneratedPlan] = useState<PersonalCoachingPlan | null>(null);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [isActivatingPlan, setIsActivatingPlan] = useState(false);
+
+  // DOB live validation
   const dobValidation = parseAndValidateDob(dobInput);
-  const calculatedAge = dobValidation.isValid ? dobValidation.ageYears : undefined;
 
-  const parsedWeight = parseFloat(weightKg.trim());
-  const parsedHeight = parseFloat(heightCm.trim());
-
-  const areBiometricsValid =
-    !isNaN(parsedWeight) &&
-    parsedWeight >= 25 &&
-    parsedWeight <= 350 &&
-    !isNaN(parsedHeight) &&
-    parsedHeight >= 80 &&
-    parsedHeight <= 260 &&
-    calculatedAge !== undefined &&
-    gender !== null;
-
-  // Real-time calculation previews (strictly non-fabricated)
-  let bmr: number | null = null;
-  let tdee: number | null = null;
-  let targetCalorieResult: { targetCalories: number; adjustmentPercentage: number; safetyWarning?: string } | null = null;
-
-  if (areBiometricsValid && calculatedAge && gender && activityLevel) {
-    try {
-      if (gender === 'female' || gender === 'male') {
-        bmr = calculateBmrMifflinStJeor({
-          weightKg: parsedWeight,
-          heightCm: parsedHeight,
-          ageYears: calculatedAge,
-          gender,
-        });
-      } else {
-        // Median biological calculation for non_binary / prefer_not_to_say
-        const maleBmr = calculateBmrMifflinStJeor({
-          weightKg: parsedWeight,
-          heightCm: parsedHeight,
-          ageYears: calculatedAge,
-          gender: 'male',
-        });
-        const femaleBmr = calculateBmrMifflinStJeor({
-          weightKg: parsedWeight,
-          heightCm: parsedHeight,
-          ageYears: calculatedAge,
-          gender: 'female',
-        });
-        bmr = Math.round((maleBmr + femaleBmr) / 2);
-      }
-
-      tdee = calculateTdee(bmr, activityLevel);
-      targetCalorieResult = calculateTargetCalories({
-        tdee,
-        goal: primaryGoal,
-        gender: gender === 'female' ? 'female' : 'male',
-      });
-    } catch {
-      // Invalid range handling
+  // Toggle equipment item in multi-select
+  const handleToggleEquipment = (item: EquipmentItem) => {
+    if (item === 'none') {
+      setSelectedEquipment(['none']);
+      return;
     }
-  }
-
-  const validateStep1 = (): boolean => {
-    const errs: Record<string, string> = {};
-
-    if (!displayName.trim() || displayName.trim().length < 2) {
-      errs.displayName = 'Please enter your name (at least 2 characters).';
+    const filtered = selectedEquipment.filter((e) => e !== 'none');
+    if (filtered.includes(item)) {
+      const next = filtered.filter((e) => e !== item);
+      setSelectedEquipment(next.length === 0 ? ['none'] : next);
+    } else {
+      setSelectedEquipment([...filtered, item]);
     }
-
-    if (!dobInput.trim()) {
-      errs.dob = 'Please enter your date of birth in DD/MM/YYYY format.';
-    } else if (!dobValidation.isValid) {
-      errs.dob = dobValidation.errorMessage ?? 'Invalid date of birth.';
-    }
-
-    if (!heightCm.trim() || isNaN(parsedHeight) || parsedHeight < 80 || parsedHeight > 260) {
-      errs.height = 'Height must be between 80 cm and 260 cm.';
-    }
-
-    if (!weightKg.trim() || isNaN(parsedWeight) || parsedWeight < 25 || parsedWeight > 350) {
-      errs.weight = 'Weight must be between 25 kg and 350 kg.';
-    }
-
-    if (!gender) {
-      errs.gender = 'Please select a gender option for metabolic energy calibration.';
-    }
-
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
   };
 
-  const validateStep2 = (): boolean => {
-    const errs: Record<string, string> = {};
-
-    if (!activityLevel) {
-      errs.activityLevel = 'Please select your typical weekly activity level.';
+  // Toggle limitation item in multi-select
+  const handleToggleLimitation = (item: PhysicalLimitation) => {
+    if (item === 'none') {
+      setSelectedLimitations(['none']);
+      return;
     }
-
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+    const filtered = selectedLimitations.filter((e) => e !== 'none');
+    if (filtered.includes(item)) {
+      const next = filtered.filter((e) => e !== item);
+      setSelectedLimitations(next.length === 0 ? ['none'] : next);
+    } else {
+      setSelectedLimitations([...filtered, item]);
+    }
   };
 
+  // Step Validation & Navigation
   const handleNextFromStep1 = () => {
-    if (validateStep1()) {
-      setErrors({});
-      setStep(2);
-    }
-  };
-
-  const handleNextFromStep2 = () => {
-    if (validateStep2()) {
-      setErrors({});
-      setStep(3);
-    }
-  };
-
-  const handleFinish = async () => {
-    if (isSaving) return;
-
-    if (!validateStep1()) {
-      setStep(1);
+    if (!displayName.trim() || displayName.trim().length < 2) {
+      Alert.alert('Name Required', 'Please enter your name or nickname.');
       return;
     }
-    if (!validateStep2()) {
-      setStep(2);
+    if (!dobValidation.isValid) {
+      Alert.alert('Invalid Date of Birth', dobValidation.errorMessage || 'Please enter DD/MM/YYYY.');
       return;
     }
+    const w = parseFloat(weightKg.trim());
+    if (isNaN(w) || w < 25 || w > 350) {
+      Alert.alert('Invalid Weight', 'Please enter your weight in kg (25 - 350 kg).');
+      return;
+    }
+    const h = parseFloat(heightCm.trim());
+    if (isNaN(h) || h < 80 || h > 260) {
+      Alert.alert('Invalid Height', 'Please enter your height in cm (80 - 260 cm).');
+      return;
+    }
+    if (!gender) {
+      Alert.alert('Biological Sex Selection', 'Please select a sex option so we can accurately calibrate metabolic formulas.');
+      return;
+    }
+    setCurrentStep(2);
+  };
 
-    setIsSaving(true);
+  // Generate Plan Transition
+  const handleGeneratePlan = async () => {
+    setIsGeneratingPlan(true);
+    const userId = profile?.userId ?? `user_${Date.now()}`;
+    const w = parseFloat(weightKg.trim());
+    const h = parseFloat(heightCm.trim());
+    const waist = parseFloat(waistCm.trim());
+
+    const draftProfile = {
+      userId,
+      displayName: displayName.trim(),
+      dateOfBirth: dobValidation.isoDate,
+      gender: gender ?? 'prefer_not_to_say',
+      heightCm: h,
+      currentWeightKg: w,
+      fitnessLevel,
+      activityLevel,
+      primaryGoal,
+      trainingEnvironment: trainingEnv,
+      availableTrainingDays: availableDays,
+      sessionDurationMinutes: sessionMinutes,
+      equipmentInventory: selectedEquipment,
+      dietaryPreference: dietaryPref,
+      injuriesOrLimitations: selectedLimitations,
+      bodyMeasurements: !isNaN(waist) && waist > 30 ? { waistCm: waist } : undefined,
+      preferredUnitSystem: profile?.preferredUnitSystem ?? 'metric',
+      dailyWaterTargetMl: profile?.dailyWaterTargetMl ?? 2500,
+      createdAt: profile?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
     try {
-      const now = new Date().toISOString();
-      const isoDob = dobValidation.isoDate ?? `${new Date().getFullYear() - (calculatedAge ?? 25)}-01-01`;
+      const plan = await generateAndSetPlan(draftProfile as any);
+      setGeneratedPlan(plan);
+      setCurrentStep(6);
+    } catch (err: any) {
+      Alert.alert('Plan Generation Error', err?.message || 'Could not generate plan.');
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
 
-      // 35ml per kg hydration recommendation clamped between 2L and 5L
-      const waterTarget = Math.min(5000, Math.max(2000, Math.round(parsedWeight * 35)));
+  // Activate Plan and Enter App
+  const handleActivatePlan = async () => {
+    if (!generatedPlan) return;
+    setIsActivatingPlan(true);
+    try {
+      const userId = profile?.userId ?? `user_${Date.now()}`;
+      const w = parseFloat(weightKg.trim());
+      const h = parseFloat(heightCm.trim());
+      const waist = parseFloat(waistCm.trim());
 
-      await setProfile({
-        userId: profile?.userId ?? `user-${Date.now()}`,
+      const finalProfile = {
+        userId,
         displayName: displayName.trim(),
-        dateOfBirth: isoDob,
+        dateOfBirth: dobValidation.isoDate,
         gender: gender ?? 'prefer_not_to_say',
-        heightCm: parsedHeight,
-        currentWeightKg: parsedWeight,
+        heightCm: h,
+        currentWeightKg: w,
         fitnessLevel,
-        activityLevel: activityLevel ?? 'moderate',
+        activityLevel,
         primaryGoal,
         trainingEnvironment: trainingEnv,
-        availableTrainingDays: trainingDays,
-        preferredUnitSystem: 'metric',
-        dailyWaterTargetMl: waterTarget,
-        createdAt: profile?.createdAt ?? now,
-        updatedAt: now,
-      });
+        availableTrainingDays: availableDays,
+        sessionDurationMinutes: sessionMinutes,
+        equipmentInventory: selectedEquipment,
+        dietaryPreference: dietaryPref,
+        injuriesOrLimitations: selectedLimitations,
+        bodyMeasurements: !isNaN(waist) && waist > 30 ? { waistCm: waist } : undefined,
+        preferredUnitSystem: profile?.preferredUnitSystem ?? 'metric',
+        dailyWaterTargetMl: profile?.dailyWaterTargetMl ?? 2500,
+        createdAt: profile?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
+      await setProfile(finalProfile as any);
+      await saveAndActivatePlan(generatedPlan);
       router.replace('/(tabs)');
     } catch (err: any) {
-      Alert.alert('Storage Error', err?.message ?? 'Failed to save profile. Please try again.');
-      setIsSaving(false);
+      Alert.alert('Activation Error', err?.message || 'Failed to save personal plan.');
+    } finally {
+      setIsActivatingPlan(false);
     }
   };
 
   return (
     <ScreenContainer>
       <Header
-        title="Welcome to FITLIFE OS"
-        subtitle={
-          step === 1
-            ? 'Step 1 of 3: About You & Biometrics'
-            : step === 2
-            ? 'Step 2 of 3: Activity & Routine'
-            : 'Step 3 of 3: Goal Wizard & Calibration'
-        }
+        title="Personal Fitness Coach"
+        subtitle={`Step ${currentStep} of 6 • ${
+          currentStep === 1
+            ? 'Your Baseline'
+            : currentStep === 2
+            ? 'Your Primary Goal'
+            : currentStep === 3
+            ? 'Experience & Schedule'
+            : currentStep === 4
+            ? 'Environment & Equipment'
+            : currentStep === 5
+            ? 'Lifestyle & Safety'
+            : 'Review Your Plan'
+        }`}
       />
 
-      {/* STEP 1: PERSONAL BIOMETRICS */}
-      {step === 1 && (
-        <SurfaceCard elevated>
-          <Text style={styles.sectionHeading}>Your Baseline Biometrics</Text>
-          <Text style={styles.sectionSub}>
-            Stored privately 100% on your device. We use this to calculate your metabolic energy targets.
-          </Text>
-
-          {/* Display Name */}
-          <Text style={styles.inputLabel}>Display Name *</Text>
-          <Text style={styles.fieldExplanation}>What should we call you? Kept private to your phone.</Text>
-          <TextInput
-            style={[styles.textInput, errors.displayName ? styles.inputError : null]}
-            value={displayName}
-            onChangeText={(t) => {
-              setDisplayName(t);
-              if (errors.displayName) setErrors((prev) => ({ ...prev, displayName: '' }));
-            }}
-            placeholder="e.g. Alex"
-            placeholderTextColor={theme.colors.textMuted}
-            autoCapitalize="words"
+      {/* Progress Dots */}
+      <View style={styles.stepProgressRow}>
+        {[1, 2, 3, 4, 5, 6].map((s) => (
+          <View
+            key={s}
+            style={[
+              styles.stepDot,
+              s === currentStep && styles.stepDotActive,
+              s < currentStep && styles.stepDotCompleted,
+            ]}
           />
-          {errors.displayName ? <Text style={styles.errorText}>{errors.displayName}</Text> : null}
+        ))}
+      </View>
 
-          {/* Date of Birth (DD/MM/YYYY) */}
-          <Text style={styles.inputLabel}>Date of Birth (DD/MM/YYYY) *</Text>
-          <Text style={styles.fieldExplanation}>
-            Used to dynamically calculate your age for Mifflin-St Jeor metabolic equations. Never shared.
+      {/* STEP 1: BASIC INFORMATION */}
+      {currentStep === 1 && (
+        <SurfaceCard elevated>
+          <Text style={styles.sectionTitle}>Tell us about your body</Text>
+          <Text style={styles.sectionSubtitle}>
+            We use these measurements strictly to calculate your daily energy baseline. None of your data ever leaves this phone.
           </Text>
+
+          <Text style={styles.inputLabel}>What should we call you?</Text>
           <TextInput
-            style={[styles.textInput, errors.dob ? styles.inputError : null]}
-            value={dobInput}
-            onChangeText={(t) => {
-              setDobInput(t);
-              if (errors.dob) setErrors((prev) => ({ ...prev, dob: '' }));
-            }}
-            placeholder="e.g. 24/08/1998"
+            style={styles.textInput}
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="e.g. Aarav"
             placeholderTextColor={theme.colors.textMuted}
-            keyboardType="numbers-and-punctuation"
+          />
+
+          <Text style={styles.inputLabel}>Date of Birth (DD/MM/YYYY)</Text>
+          <TextInput
+            style={[styles.textInput, !dobValidation.isValid && dobInput.length >= 8 && styles.inputError]}
+            value={dobInput}
+            onChangeText={setDobInput}
+            placeholder="e.g. 15/08/1998"
+            placeholderTextColor={theme.colors.textMuted}
+            keyboardType="numeric"
             maxLength={10}
           />
-          {errors.dob ? <Text style={styles.errorText}>{errors.dob}</Text> : null}
-          {dobValidation.isValid && dobValidation.ageYears !== undefined ? (
-            <Text style={styles.ageBadge}>✓ Age: {dobValidation.ageYears} years old</Text>
-          ) : null}
+          {dobValidation.isValid && (
+            <Text style={styles.helperText}>Calculated age: {dobValidation.ageYears} years old</Text>
+          )}
 
-          {/* Height and Weight Row */}
           <View style={styles.twoCol}>
             <View style={styles.col}>
-              <Text style={styles.inputLabel}>Height (cm) *</Text>
+              <Text style={styles.inputLabel}>Height (cm)</Text>
               <TextInput
-                style={[styles.textInput, errors.height ? styles.inputError : null]}
+                style={styles.textInput}
                 value={heightCm}
-                onChangeText={(t) => {
-                  setHeightCm(t);
-                  if (errors.height) setErrors((prev) => ({ ...prev, height: '' }));
-                }}
-                keyboardType="numeric"
-                placeholder="e.g. 175"
+                onChangeText={setHeightCm}
+                placeholder="175"
                 placeholderTextColor={theme.colors.textMuted}
-                maxLength={3}
+                keyboardType="numeric"
               />
-              {errors.height ? <Text style={styles.errorText}>{errors.height}</Text> : null}
             </View>
-
             <View style={styles.col}>
-              <Text style={styles.inputLabel}>Weight (kg) *</Text>
+              <Text style={styles.inputLabel}>Current Weight (kg)</Text>
               <TextInput
-                style={[styles.textInput, errors.weight ? styles.inputError : null]}
+                style={styles.textInput}
                 value={weightKg}
-                onChangeText={(t) => {
-                  setWeightKg(t);
-                  if (errors.weight) setErrors((prev) => ({ ...prev, weight: '' }));
-                }}
-                keyboardType="numeric"
-                placeholder="e.g. 70"
+                onChangeText={setWeightKg}
+                placeholder="70"
                 placeholderTextColor={theme.colors.textMuted}
-                maxLength={5}
+                keyboardType="numeric"
               />
-              {errors.weight ? <Text style={styles.errorText}>{errors.weight}</Text> : null}
             </View>
           </View>
 
-          {/* Gender */}
-          <Text style={styles.inputLabel}>Gender for Metabolic Formula *</Text>
-          <Text style={styles.fieldExplanation}>
-            Mifflin-St Jeor formula requires biological sex for resting BMR. Neutral uses physiological median.
+          <Text style={styles.inputLabel}>Biological Sex (Required for metabolic equations)</Text>
+          <Text style={styles.helperText}>
+            Mifflin-St Jeor metabolic formulas require biological sex to estimate natural resting calorie consumption accurately.
           </Text>
           <View style={styles.pillRow}>
-            {(
-              [
-                { key: 'male', label: 'Male' },
-                { key: 'female', label: 'Female' },
-                { key: 'non_binary', label: 'Non-Binary' },
-                { key: 'prefer_not_to_say', label: 'Prefer not to say' },
-              ] as { key: Gender; label: string }[]
-            ).map((g) => (
+            {[
+              { id: 'male', label: 'Male' },
+              { id: 'female', label: 'Female' },
+              { id: 'non_binary', label: 'Other / Prefer not to say' },
+            ].map((item) => (
               <TouchableOpacity
-                key={g.key}
-                style={[styles.pill, gender === g.key && styles.activePill]}
-                onPress={() => {
-                  setGender(g.key);
-                  if (errors.gender) setErrors((prev) => ({ ...prev, gender: '' }));
-                }}
-                activeOpacity={0.7}
+                key={item.id}
+                style={[styles.choicePill, gender === item.id && styles.choicePillActive]}
+                onPress={() => setGender(item.id as Gender)}
               >
-                <Text style={[styles.pillText, gender === g.key && styles.activePillText]}>
-                  {g.label}
+                <Text style={[styles.choiceText, gender === item.id && styles.choiceTextActive]}>
+                  {item.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          {errors.gender ? <Text style={styles.errorText}>{errors.gender}</Text> : null}
+
+          <Text style={styles.inputLabel}>Waist Measurement (cm, Optional)</Text>
+          <TextInput
+            style={styles.textInput}
+            value={waistCm}
+            onChangeText={setWaistCm}
+            placeholder="e.g. 82 (Optional)"
+            placeholderTextColor={theme.colors.textMuted}
+            keyboardType="numeric"
+          />
 
           <Button
-            title="Next: Activity & Routine"
+            title="Continue to Goal Selection"
             onPress={handleNextFromStep1}
-            style={styles.nextBtn}
+            style={styles.submitBtn}
           />
         </SurfaceCard>
       )}
 
-      {/* STEP 2: EXPERIENCE, ACTIVITY & SCHEDULE */}
-      {step === 2 && (
+      {/* STEP 2: PRIMARY FITNESS GOAL */}
+      {currentStep === 2 && (
         <SurfaceCard elevated>
-          <Text style={styles.sectionHeading}>Your Daily Routine & Schedule</Text>
-          <Text style={styles.sectionSub}>
-            We adapt workout recommendations to your realistic schedule and current fitness level.
+          <Text style={styles.sectionTitle}>What is your primary goal?</Text>
+          <Text style={styles.sectionSubtitle}>
+            Your chosen goal is the main driver of your plan. We never force fat loss onto you based on a BMI number.
           </Text>
 
-          {/* Fitness Experience Level */}
-          <Text style={styles.inputLabel}>Fitness Experience</Text>
-          <Text style={styles.fieldExplanation}>Ensures exercise volume and technique cues match your background.</Text>
-          <View style={styles.pillRow}>
-            {(
-              [
-                { key: 'beginner', label: 'Beginner (New or < 1 yr)' },
-                { key: 'intermediate', label: 'Intermediate (1 - 3 yrs)' },
-                { key: 'advanced', label: 'Advanced (3+ yrs consistent)' },
-              ] as { key: FitnessLevel; label: string }[]
-            ).map((lvl) => (
+          {[
+            { id: 'fat_loss', title: '🔥 Lose Body Fat', desc: 'Burn fat and tone up while protecting muscle.' },
+            { id: 'muscle_gain', title: '💪 Build Lean Muscle', desc: 'Add functional muscle size and strength.' },
+            { id: 'general_fitness', title: '⚡ Improve Overall Fitness', desc: 'Feel energetic, stay active, and build stamina.' },
+            { id: 'strength', title: '🏋️ Increase Strength', desc: 'Lift heavier, feel powerful, and strengthen bones.' },
+            { id: 'maintenance', title: '⚖️ Maintain Current Fitness', desc: 'Sustain your healthy habits and stay balanced.' },
+            { id: 'recomposition', title: '🔄 Body Recomposition', desc: 'Simultaneously build muscle and burn body fat.' },
+          ].map((g) => (
+            <TouchableOpacity
+              key={g.id}
+              style={[styles.goalCard, primaryGoal === g.id && styles.goalCardActive]}
+              onPress={() => setPrimaryGoal(g.id as PrimaryGoal)}
+            >
+              <Text style={[styles.goalTitle, primaryGoal === g.id && styles.goalTitleActive]}>{g.title}</Text>
+              <Text style={styles.goalDesc}>{g.desc}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <View style={styles.btnRow}>
+            <Button title="Back" variant="outline" onPress={() => setCurrentStep(1)} style={{ flex: 1 }} />
+            <Button title="Next" onPress={() => setCurrentStep(3)} style={{ flex: 2 }} />
+          </View>
+        </SurfaceCard>
+      )}
+
+      {/* STEP 3: EXPERIENCE & SCHEDULE */}
+      {currentStep === 3 && (
+        <SurfaceCard elevated>
+          <Text style={styles.sectionTitle}>Experience & Time Available</Text>
+          <Text style={styles.sectionSubtitle}>
+            A plan only works if it fits comfortably into your real week.
+          </Text>
+
+          <Text style={styles.inputLabel}>Your Fitness Experience</Text>
+          <View style={styles.optionsCol}>
+            {[
+              { id: 'beginner', title: 'Complete Beginner', desc: 'Never exercised or returning after years away.' },
+              { id: 'intermediate', title: 'Some Experience', desc: 'Familiar with basic exercises and workout routine.' },
+              { id: 'advanced', title: 'Experienced', desc: 'Training consistently for 1+ years.' },
+            ].map((item) => (
               <TouchableOpacity
-                key={lvl.key}
-                style={[styles.pill, fitnessLevel === lvl.key && styles.activePill]}
-                onPress={() => setFitnessLevel(lvl.key)}
-                activeOpacity={0.7}
+                key={item.id}
+                style={[styles.levelCard, fitnessLevel === item.id && styles.levelCardActive]}
+                onPress={() => setFitnessLevel(item.id as FitnessLevel)}
               >
-                <Text style={[styles.pillText, fitnessLevel === lvl.key && styles.activePillText]}>
-                  {lvl.label}
+                <Text style={[styles.levelTitle, fitnessLevel === item.id && styles.levelTitleActive]}>
+                  {item.title}
                 </Text>
+                <Text style={styles.levelDesc}>{item.desc}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Daily Activity Level */}
-          <Text style={styles.inputLabel}>Daily Activity Level *</Text>
-          <Text style={styles.fieldExplanation}>Helps calculate your Total Daily Energy Expenditure (TDEE).</Text>
-          <View style={styles.pillRow}>
-            {(
-              [
-                { key: 'sedentary', label: 'Sedentary (Desk work, mostly sitting)' },
-                { key: 'light', label: 'Lightly Active (Light walking / 1-2 workouts)' },
-                { key: 'moderate', label: 'Moderately Active (Active day / 3-5 workouts)' },
-                { key: 'very_active', label: 'Very Active (Physical job or 6-7 workouts)' },
-              ] as { key: ActivityLevel; label: string }[]
-            ).map((act) => (
-              <TouchableOpacity
-                key={act.key}
-                style={[styles.pill, activityLevel === act.key && styles.activePill]}
-                onPress={() => {
-                  setActivityLevel(act.key);
-                  if (errors.activityLevel) setErrors((prev) => ({ ...prev, activityLevel: '' }));
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.pillText, activityLevel === act.key && styles.activePillText]}>
-                  {act.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {errors.activityLevel ? <Text style={styles.errorText}>{errors.activityLevel}</Text> : null}
-
-          {/* Available Training Days Per Week */}
-          <Text style={styles.inputLabel}>Available Training Days Per Week</Text>
-          <Text style={styles.fieldExplanation}>
-            How many days per week can you realistically exercise? (We schedule rest on other days).
-          </Text>
-          <View style={styles.pillRow}>
+          <Text style={styles.inputLabel}>How many days per week can you exercise?</Text>
+          <View style={styles.daysRow}>
             {[2, 3, 4, 5, 6].map((days) => (
               <TouchableOpacity
                 key={days}
-                style={[styles.pill, styles.smallPill, trainingDays === days && styles.activePill]}
-                onPress={() => setTrainingDays(days)}
-                activeOpacity={0.7}
+                style={[styles.dayPill, availableDays === days && styles.dayPillActive]}
+                onPress={() => setAvailableDays(days)}
               >
-                <Text style={[styles.pillText, trainingDays === days && styles.activePillText]}>
-                  {days} Days / Wk
+                <Text style={[styles.dayPillText, availableDays === days && styles.dayPillTextActive]}>
+                  {days} Days
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Training Environment */}
-          <Text style={styles.inputLabel}>Where Will You Exercise?</Text>
-          <Text style={styles.fieldExplanation}>Tailors the exercise library to your available equipment.</Text>
-          <View style={styles.pillRow}>
-            {(
-              [
-                { key: 'gym', label: 'Gym (Barbells & Machines)' },
-                { key: 'home', label: 'Home (Dumbbells / Mat)' },
-                { key: 'calisthenics', label: 'Outdoor / Calisthenics' },
-              ] as { key: TrainingEnvironment; label: string }[]
-            ).map((env) => (
+          <Text style={styles.inputLabel}>Available time per workout session</Text>
+          <View style={styles.daysRow}>
+            {[
+              { min: 20, label: '20 Mins' },
+              { min: 30, label: '30 Mins' },
+              { min: 45, label: '45 Mins' },
+              { min: 60, label: '60 Mins' },
+            ].map((item) => (
               <TouchableOpacity
-                key={env.key}
-                style={[styles.pill, trainingEnv === env.key && styles.activePill]}
-                onPress={() => setTrainingEnv(env.key)}
-                activeOpacity={0.7}
+                key={item.min}
+                style={[styles.dayPill, sessionMinutes === item.min && styles.dayPillActive]}
+                onPress={() => setSessionMinutes(item.min as SessionDurationMinutes)}
               >
-                <Text style={[styles.pillText, trainingEnv === env.key && styles.activePillText]}>
-                  {env.label}
+                <Text style={[styles.dayPillText, sessionMinutes === item.min && styles.dayPillTextActive]}>
+                  {item.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <View style={styles.twoBtnRow}>
+          <View style={styles.btnRow}>
+            <Button title="Back" variant="outline" onPress={() => setCurrentStep(2)} style={{ flex: 1 }} />
+            <Button title="Next" onPress={() => setCurrentStep(4)} style={{ flex: 2 }} />
+          </View>
+        </SurfaceCard>
+      )}
+
+      {/* STEP 4: ENVIRONMENT & EQUIPMENT INVENTORY */}
+      {currentStep === 4 && (
+        <SurfaceCard elevated>
+          <Text style={styles.sectionTitle}>Where will you exercise?</Text>
+          <Text style={styles.sectionSubtitle}>
+            Your selection determines what exercises you see. If you are at home with no equipment, we will never prescribe barbell or machine exercises!
+          </Text>
+
+          <View style={styles.optionsCol}>
+            {[
+              { id: 'home', title: '🏡 Home Workout', desc: 'Exercise in living room or bedroom.' },
+              { id: 'gym', title: '🏢 Commercial Gym', desc: 'Access to machines, barbells, dumbbells, cables.' },
+              { id: 'calisthenics', title: '🤸 Calisthenics / Park', desc: 'Bodyweight training using bars and open space.' },
+            ].map((env) => (
+              <TouchableOpacity
+                key={env.id}
+                style={[styles.levelCard, trainingEnv === env.id && styles.levelCardActive]}
+                onPress={() => setTrainingEnv(env.id as TrainingEnvironment)}
+              >
+                <Text style={[styles.levelTitle, trainingEnv === env.id && styles.levelTitleActive]}>
+                  {env.title}
+                </Text>
+                <Text style={styles.levelDesc}>{env.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {trainingEnv === 'home' && (
+            <View style={{ marginTop: theme.spacing.md }}>
+              <Text style={styles.inputLabel}>What equipment do you have at home? (Tap all that apply)</Text>
+              <View style={styles.equipmentGrid}>
+                {[
+                  { id: 'none', label: '🚫 No Equipment (Bodyweight only)' },
+                  { id: 'dumbbells', label: '🏋️ Dumbbells (Pair)' },
+                  { id: 'resistance_bands', label: '🎗️ Resistance Bands' },
+                  { id: 'pull_up_bar', label: '🚪 Doorway Pull-Up Bar' },
+                  { id: 'exercise_mat', label: '🧘 Yoga / Exercise Mat' },
+                  { id: 'kettlebell', label: '🔔 Kettlebell' },
+                  { id: 'bench', label: '🪑 Workout Bench / Sturdy Chair' },
+                  { id: 'barbell', label: '🔩 Barbell & Weight Plates' },
+                ].map((eq) => {
+                  const isChecked = selectedEquipment.includes(eq.id as EquipmentItem);
+                  return (
+                    <TouchableOpacity
+                      key={eq.id}
+                      style={[styles.equipCard, isChecked && styles.equipCardActive]}
+                      onPress={() => handleToggleEquipment(eq.id as EquipmentItem)}
+                    >
+                      <Text style={[styles.equipText, isChecked && styles.equipTextActive]}>{eq.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.btnRow}>
+            <Button title="Back" variant="outline" onPress={() => setCurrentStep(3)} style={{ flex: 1 }} />
+            <Button title="Next" onPress={() => setCurrentStep(5)} style={{ flex: 2 }} />
+          </View>
+        </SurfaceCard>
+      )}
+
+      {/* STEP 5: LIFESTYLE & LIMITATIONS */}
+      {currentStep === 5 && (
+        <SurfaceCard elevated>
+          <Text style={styles.sectionTitle}>Dietary Preference & Safety</Text>
+          <Text style={styles.sectionSubtitle}>
+            We tailor your meal ideas to your food habits and keep your workouts safe around joint issues.
+          </Text>
+
+          <Text style={styles.inputLabel}>Dietary Preference</Text>
+          <View style={styles.optionsCol}>
+            {[
+              { id: 'vegetarian', title: '🌱 Vegetarian', desc: 'Dal, Paneer, Curd, Veggies, Rice & Roti' },
+              { id: 'non_vegetarian', title: '🍗 Non-Vegetarian (Includes Fish & Chicken)', desc: 'Eggs, Kerala Fish Curry, Chicken, Dal, Rice' },
+              { id: 'eggetarian', title: '🥚 Eggetarian', desc: 'Eggs + Vegetarian diet (No meat or fish)' },
+              { id: 'vegan', title: '🌿 100% Vegan', desc: 'Plant-based (No dairy, no eggs, no animal products)' },
+            ].map((diet) => (
+              <TouchableOpacity
+                key={diet.id}
+                style={[styles.levelCard, dietaryPref === diet.id && styles.levelCardActive]}
+                onPress={() => setDietaryPref(diet.id as DietaryPreference)}
+              >
+                <Text style={[styles.levelTitle, dietaryPref === diet.id && styles.levelTitleActive]}>{diet.title}</Text>
+                <Text style={styles.levelDesc}>{diet.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.inputLabel}>Any physical limitations or joint aches to protect?</Text>
+          <Text style={styles.helperText}>
+            We automatically replace exercises that stress these joints with knee/back-friendly alternatives.
+          </Text>
+          <View style={styles.equipmentGrid}>
+            {[
+              { id: 'none', label: '✅ No limitations / Feel healthy' },
+              { id: 'knee_pain', label: '🦵 Sensitive Knees / Knee pain' },
+              { id: 'lower_back', label: '🧘 Lower Back sensitivity' },
+              { id: 'shoulder_pain', label: '💪 Shoulder impingement' },
+            ].map((lim) => {
+              const isChecked = selectedLimitations.includes(lim.id as PhysicalLimitation);
+              return (
+                <TouchableOpacity
+                  key={lim.id}
+                  style={[styles.equipCard, isChecked && styles.equipCardActive]}
+                  onPress={() => handleToggleLimitation(lim.id as PhysicalLimitation)}
+                >
+                  <Text style={[styles.equipText, isChecked && styles.equipTextActive]}>{lim.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.btnRow}>
+            <Button title="Back" variant="outline" onPress={() => setCurrentStep(4)} style={{ flex: 1 }} />
             <Button
-              title="Back"
-              variant="outline"
-              onPress={() => setStep(1)}
-              style={styles.backBtn}
-            />
-            <Button
-              title="Next: Set Goal"
-              onPress={handleNextFromStep2}
-              style={styles.saveBtn}
+              title="Generate My Plan ✨"
+              onPress={handleGeneratePlan}
+              loading={isGeneratingPlan}
+              style={{ flex: 2 }}
             />
           </View>
         </SurfaceCard>
       )}
 
-      {/* STEP 3: GOAL WIZARD & CALIBRATION */}
-      {step === 3 && (
-        <SurfaceCard elevated>
-          <Text style={styles.sectionHeading}>Choose Your Primary Goal</Text>
-          <Text style={styles.sectionSub}>
-            Select what you want to achieve. We never assume bodybuilding or extreme dieting.
-          </Text>
+      {/* STEP 6: PLAN REVIEW & ACTIVATION */}
+      {currentStep === 6 && generatedPlan && (
+        <ScrollView style={{ flex: 1 }}>
+          <SurfaceCard elevated>
+            <View style={styles.planHeaderBadge}>
+              <Text style={styles.planBadgeText}>🎯 YOUR CUSTOM PLAN IS READY</Text>
+            </View>
 
-          {/* Goals List with Explanations */}
-          <View style={styles.goalsList}>
-            {(
-              [
-                {
-                  key: 'fat_loss',
-                  title: 'Lose Body Fat',
-                  desc: 'Gentle, sustainable calorie deficit while preserving muscle tone and vitality.',
-                },
-                {
-                  key: 'muscle_gain',
-                  title: 'Build Muscle',
-                  desc: 'A modest energy surplus with optimal protein to support muscle growth.',
-                },
-                {
-                  key: 'strength',
-                  title: 'Become Stronger',
-                  desc: 'Focus on progressive compound lifting and functional physical resilience.',
-                },
-                {
-                  key: 'general_fitness',
-                  title: 'Improve General Fitness',
-                  desc: 'Balanced whole-body health, daily energy, joint mobility, and stamina.',
-                },
-                {
-                  key: 'stamina',
-                  title: 'Improve Stamina & Conditioning',
-                  desc: 'Enhance cardiovascular capacity, endurance, and heart health.',
-                },
-                {
-                  key: 'health_consistency',
-                  title: 'Health & Habit Consistency',
-                  desc: 'Build consistent daily hydration, healthy eating, and walking without burnout.',
-                },
-                {
-                  key: 'maintenance',
-                  title: 'Maintain Current Fitness',
-                  desc: 'Keep your current weight and fitness level steady with zero pressure.',
-                },
-              ] as { key: PrimaryGoal; title: string; desc: string }[]
-            ).map((g) => (
-              <TouchableOpacity
-                key={g.key}
-                style={[styles.goalCard, primaryGoal === g.key && styles.activeGoalCard]}
-                onPress={() => setPrimaryGoal(g.key)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.goalCardHeader}>
-                  <Text style={[styles.goalCardTitle, primaryGoal === g.key && styles.activeGoalCardTitle]}>
-                    {g.title}
-                  </Text>
-                  {primaryGoal === g.key && <Text style={styles.checkIcon}>✓</Text>}
+            <Text style={styles.planGoalTitle}>{generatedPlan.goalTitle}</Text>
+            <Text style={styles.planBaseline}>{generatedPlan.baselineSummary}</Text>
+
+            <View style={styles.planHighlightBox}>
+              <Text style={styles.highlightTitle}>💡 Why this plan was created for you:</Text>
+              <Text style={styles.highlightDesc}>{generatedPlan.whyThisPlanGenerated}</Text>
+            </View>
+
+            {/* Weekly Schedule Overview */}
+            <Text style={styles.subSectionTitle}>📅 Your Weekly Training Schedule ({generatedPlan.weeklyWorkouts.length} sessions/week):</Text>
+            {generatedPlan.weeklyWorkouts.map((w, idx) => (
+              <View key={idx} style={styles.routinePreviewCard}>
+                <View style={styles.routineHeaderRow}>
+                  <Text style={styles.routineDayText}>{w.dayName}</Text>
+                  <Text style={styles.routineTimeText}>⏱️ {w.estimatedMinutes} Mins</Text>
                 </View>
-                <Text style={styles.goalCardDesc}>{g.desc}</Text>
-              </TouchableOpacity>
+                <Text style={styles.routineTitleText}>{w.title}</Text>
+                <Text style={styles.routineExSummary}>
+                  {w.exercises.length} Exercises: {w.exercises.map((e) => e.name).join(', ')}
+                </Text>
+              </View>
             ))}
-          </View>
 
-          {/* Scientific Metabolic Calibration Box */}
-          <View style={styles.previewBox}>
-            <Text style={styles.previewHeading}>Your Personalized Calibration</Text>
-            {areBiometricsValid && bmr && tdee && targetCalorieResult ? (
-              <>
-                <Text style={styles.previewRow}>
-                  Basal Energy Needs (BMR): <Text style={styles.bold}>{bmr} kcal/day</Text>
-                </Text>
-                <Text style={styles.previewSubNote}>
-                  Energy your body burns naturally just staying alive at complete rest.
-                </Text>
+            {/* Daily Meals Overview */}
+            <Text style={styles.subSectionTitle}>🍛 Suggested Daily Meals (Familiar Portions):</Text>
+            {generatedPlan.dailyMeals.map((m, idx) => (
+              <View key={idx} style={styles.mealPreviewCard}>
+                <Text style={styles.mealTypeBadge}>{m.mealType.toUpperCase()}</Text>
+                <Text style={styles.mealTitleText}>{m.title}</Text>
+                <Text style={styles.portionGuideText}>🍽️ Portion: {m.portionGuide}</Text>
+                <Text style={styles.macroTag}>Approx. {m.approxCalories} kcal • {m.approxProteinG}g Protein</Text>
+              </View>
+            ))}
 
-                <Text style={styles.previewRow}>
-                  Total Daily Burn (TDEE): <Text style={styles.bold}>{tdee} kcal/day</Text>
-                </Text>
-                <Text style={styles.previewSubNote}>
-                  Estimated total calories burned including your daily activity level.
-                </Text>
+            {/* Milestones */}
+            <Text style={styles.subSectionTitle}>🏆 Expected Progression Milestones:</Text>
+            {generatedPlan.progressionMilestones.map((milestone, idx) => (
+              <View key={idx} style={styles.milestoneRow}>
+                <Text style={styles.milestoneDot}>•</Text>
+                <Text style={styles.milestoneText}>{milestone}</Text>
+              </View>
+            ))}
 
-                <Text style={[styles.previewRow, { color: theme.colors.primary, marginTop: 4 }]}>
-                  Calibrated Intake Target: <Text style={styles.bold}>{targetCalorieResult.targetCalories} kcal/day</Text>
-                </Text>
-                <Text style={styles.previewSubNote}>
-                  Evidence-based target tailored for your goal ({targetCalorieResult.adjustmentPercentage}% adjustment).
-                </Text>
-
-                <Text style={styles.previewRow}>
-                  Recommended Hydration: <Text style={styles.bold}>{Math.min(5, Math.max(2, (parsedWeight * 0.035))).toFixed(1)} Litres/day</Text>
-                </Text>
-                <Text style={styles.previewSubNote}>
-                  Based on 35ml per kilogram of your body weight.
-                </Text>
-
-                {targetCalorieResult.safetyWarning ? (
-                  <Text style={styles.warningText}>⚠️ {targetCalorieResult.safetyWarning}</Text>
-                ) : null}
-              </>
-            ) : (
-              <Text style={styles.incompleteText}>
-                Complete all biometrics in Step 1 to calculate your scientific targets.
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.twoBtnRow}>
-            <Button
-              title="Back"
-              variant="outline"
-              onPress={() => setStep(2)}
-              style={styles.backBtn}
-              disabled={isSaving}
-            />
-            <Button
-              title="Save & Launch FITLIFE OS"
-              onPress={handleFinish}
-              loading={isSaving}
-              disabled={isSaving}
-              style={styles.saveBtn}
-            />
-          </View>
-        </SurfaceCard>
+            <View style={styles.actionWrap}>
+              <Button
+                title="Activate My Personal Plan 🚀"
+                onPress={handleActivatePlan}
+                loading={isActivatingPlan}
+                style={{ width: '100%' }}
+              />
+              <Button
+                title="Adjust Inputs"
+                variant="outline"
+                onPress={() => setCurrentStep(1)}
+                style={{ width: '100%', marginTop: theme.spacing.sm }}
+              />
+            </View>
+          </SurfaceCard>
+        </ScrollView>
       )}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionHeading: {
+  stepProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  stepDot: {
+    width: 24,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.borderLight,
+  },
+  stepDotActive: {
+    backgroundColor: theme.colors.primary,
+    width: 36,
+  },
+  stepDotCompleted: {
+    backgroundColor: theme.colors.primaryDark ?? '#1b4332',
+  },
+  sectionTitle: {
     ...theme.typography.h2,
     color: theme.colors.textPrimary,
     marginBottom: 4,
   },
-  sectionSub: {
+  sectionSubtitle: {
     ...theme.typography.caption,
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
     marginBottom: theme.spacing.md,
     lineHeight: 18,
   },
   inputLabel: {
     ...theme.typography.captionBold,
     color: theme.colors.textSecondary,
-    marginBottom: 2,
     marginTop: theme.spacing.sm,
+    marginBottom: 4,
     textTransform: 'uppercase',
   },
-  fieldExplanation: {
+  helperText: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    fontSize: 11,
     marginBottom: 6,
+    fontSize: 11,
   },
   textInput: {
     backgroundColor: theme.colors.surfaceElevated,
@@ -638,27 +705,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     color: theme.colors.textPrimary,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 12,
+    padding: theme.spacing.md,
     fontSize: 15,
-    minHeight: 48,
+    marginBottom: theme.spacing.sm,
   },
   inputError: {
     borderColor: theme.colors.danger,
   },
-  errorText: {
-    ...theme.typography.caption,
-    color: theme.colors.danger,
-    marginTop: 4,
-  },
-  ageBadge: {
-    ...theme.typography.captionBold,
-    color: theme.colors.primary,
-    marginTop: 4,
-  },
   twoCol: {
     flexDirection: 'row',
-    gap: 12,
+    gap: theme.spacing.sm,
   },
   col: {
     flex: 1,
@@ -667,124 +723,262 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginVertical: 4,
+    marginBottom: theme.spacing.md,
   },
-  pill: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surfaceElevated,
+  choicePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.borderRadius.full,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceElevated,
   },
-  smallPill: {
-    minWidth: 80,
-  },
-  activePill: {
-    backgroundColor: theme.colors.primary,
+  choicePillActive: {
     borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary,
   },
-  pillText: {
+  choiceText: {
     ...theme.typography.captionBold,
     color: theme.colors.textSecondary,
-    fontSize: 12,
   },
-  activePillText: {
+  choiceTextActive: {
     color: theme.colors.textInverse,
   },
-  nextBtn: {
-    marginTop: theme.spacing.xl,
-  },
-  goalsList: {
-    gap: 10,
-    marginVertical: theme.spacing.sm,
+  optionsCol: {
+    gap: 8,
+    marginBottom: theme.spacing.md,
   },
   goalCard: {
-    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    marginBottom: 8,
   },
-  activeGoalCard: {
+  goalCardActive: {
     borderColor: theme.colors.primary,
-    backgroundColor: 'rgba(0, 230, 118, 0.08)',
+    backgroundColor: theme.colors.surfaceHighlight,
   },
-  goalCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+  goalTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+    fontSize: 15,
   },
-  goalCardTitle: {
+  goalTitleActive: {
+    color: theme.colors.primary,
+  },
+  goalDesc: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  levelCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  levelCardActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surfaceHighlight,
+  },
+  levelTitle: {
     ...theme.typography.bodyBold,
     color: theme.colors.textPrimary,
   },
-  activeGoalCardTitle: {
+  levelTitleActive: {
     color: theme.colors.primary,
   },
-  checkIcon: {
-    color: theme.colors.primary,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  goalCardDesc: {
+  levelDesc: {
     ...theme.typography.caption,
-    color: theme.colors.textSecondary,
-    lineHeight: 16,
+    color: theme.colors.textMuted,
+    marginTop: 2,
   },
-  previewBox: {
+  daysRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  dayPill: {
+    flex: 1,
+    minWidth: 60,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceElevated,
+  },
+  dayPillActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary,
+  },
+  dayPillText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textSecondary,
+  },
+  dayPillTextActive: {
+    color: theme.colors.textInverse,
+  },
+  equipmentGrid: {
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  equipCard: {
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
   },
-  previewHeading: {
-    ...theme.typography.captionBold,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.sm,
-    textTransform: 'uppercase',
+  equipCardActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surfaceHighlight,
   },
-  previewRow: {
+  equipText: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
-    marginVertical: 1,
+    fontSize: 13,
   },
-  previewSubNote: {
+  equipTextActive: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+  },
+  btnRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+  },
+  submitBtn: {
+    marginTop: theme.spacing.md,
+  },
+  planHeaderBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.primaryDark ?? '#1b4332',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    marginBottom: 8,
+  },
+  planBadgeText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+    fontSize: 11,
+  },
+  planGoalTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.textPrimary,
+  },
+  planBaseline: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.md,
+  },
+  planHighlightBox: {
+    backgroundColor: theme.colors.surfaceHighlight,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary,
+    marginBottom: theme.spacing.md,
+  },
+  highlightTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.primary,
+    marginBottom: 4,
+  },
+  highlightDesc: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  subSectionTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+    marginTop: theme.spacing.sm,
+    marginBottom: 8,
+  },
+  routinePreviewCard: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  routineHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  routineDayText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+  },
+  routineTimeText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  routineTitleText: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+  },
+  routineExSummary: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+  },
+  mealPreviewCard: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  mealTypeBadge: {
+    ...theme.typography.captionBold,
+    color: theme.colors.warning,
+    fontSize: 10,
+    marginBottom: 2,
+  },
+  mealTitleText: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+  },
+  portionGuideText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  macroTag: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     fontSize: 11,
+    marginTop: 2,
+  },
+  milestoneRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 6,
   },
-  bold: {
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
+  milestoneDot: {
+    color: theme.colors.primary,
+    fontSize: 16,
+    lineHeight: 18,
   },
-  warningText: {
+  milestoneText: {
     ...theme.typography.caption,
-    color: theme.colors.warning,
-    marginTop: 6,
-  },
-  incompleteText: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    fontStyle: 'italic',
-  },
-  twoBtnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: theme.spacing.lg,
-  },
-  backBtn: {
+    color: theme.colors.textSecondary,
     flex: 1,
+    lineHeight: 18,
   },
-  saveBtn: {
-    flex: 2,
+  actionWrap: {
+    marginTop: theme.spacing.lg,
+    gap: 6,
   },
 });

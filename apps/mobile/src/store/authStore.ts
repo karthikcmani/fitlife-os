@@ -54,6 +54,17 @@ export const useAuthStore = create<AuthState>((set) => ({
             primaryGoal: localProfile.primary_goal,
             trainingEnvironment: localProfile.training_environment,
             availableTrainingDays: localProfile.available_training_days ?? 3,
+            sessionDurationMinutes: localProfile.session_duration_minutes ?? 30,
+            equipmentInventory: localProfile.equipment_inventory
+              ? JSON.parse(localProfile.equipment_inventory)
+              : ['none'],
+            dietaryPreference: localProfile.dietary_preference ?? 'vegetarian',
+            injuriesOrLimitations: localProfile.injuries_or_limitations
+              ? JSON.parse(localProfile.injuries_or_limitations)
+              : ['none'],
+            bodyMeasurements: localProfile.body_measurements
+              ? JSON.parse(localProfile.body_measurements)
+              : {},
             preferredUnitSystem: localProfile.preferred_unit_system,
             dailyWaterTargetMl: localProfile.daily_water_target_ml,
             createdAt: localProfile.created_at,
@@ -85,8 +96,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     const db = await getLocalDatabase();
     await db.runAsync(
       `INSERT OR REPLACE INTO user_profiles
-      (user_id, display_name, date_of_birth, gender, height_cm, current_weight_kg, fitness_level, activity_level, primary_goal, training_environment, available_training_days, preferred_unit_system, daily_water_target_ml, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      (user_id, display_name, date_of_birth, gender, height_cm, current_weight_kg, fitness_level, activity_level, primary_goal, training_environment, available_training_days, session_duration_minutes, equipment_inventory, dietary_preference, injuries_or_limitations, body_measurements, preferred_unit_system, daily_water_target_ml, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         profile.userId,
         profile.displayName,
@@ -99,6 +110,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         profile.primaryGoal,
         profile.trainingEnvironment,
         profile.availableTrainingDays ?? 3,
+        profile.sessionDurationMinutes ?? 30,
+        JSON.stringify(profile.equipmentInventory ?? ['none']),
+        profile.dietaryPreference ?? 'vegetarian',
+        JSON.stringify(profile.injuriesOrLimitations ?? ['none']),
+        JSON.stringify(profile.bodyMeasurements ?? {}),
         profile.preferredUnitSystem,
         profile.dailyWaterTargetMl,
         profile.createdAt,

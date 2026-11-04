@@ -88,3 +88,15 @@ This document logs architectural trade-offs, discovered technical risks, upstrea
 ### 4.5 Dynamic Age Derivation from Date of Birth
 - **Issue:** Naive `currentYear - birthYear` subtraction incorrectly aged users prior to their birthday in the current calendar year.
 - **Resolution:** Implemented `parseAndValidateDob()` and `calculateAgeFromDob()` supporting DD/MM/YYYY, leap-year boundary checking, and exact calendar birthday evaluation.
+
+### 4.6 Missing Glyph Fallback ("NO GLYPH") in Bottom Tab Bar
+- **Issue Discovered on Device:** On Nothing Phone (3a) running Nothing OS, the bottom tab bar showed tall vertical boxes labeled "NO GLYPH" because React Navigation rendered fallback slots when icons were undefined or when Unicode glyphs were missing from the system font.
+- **Resolution:** Replaced all text-based Unicode icons with pure React Native `<View>` vector icons in `TabIcons.tsx`. They render directly via native drawing primitives with zero font dependency, ensuring 100% reliable rendering across all devices.
+
+### 4.7 Information Clutter & Beginner Guidance Overhaul
+- **Issue Discovered on Device:** The previous dashboard and workout screens exposed overwhelming technical jargon (BMR, TDEE, RPE, 1RM estimations) without guiding beginners step by step. Furthermore, users exercising at home were presented with gym equipment exercises.
+- **Resolution:**
+  - Redesigned the navigation into 4 simple tabs: **Home**, **My Plan**, **Progress**, and **Profile**.
+  - Built an Equipment-Aware Coaching Generator that strictly respects home equipment (e.g. bodyweight only when no equipment is available).
+  - Built an Animated Biomechanical Exercise Avatar (`WorkoutAvatar.tsx`) that visually demonstrates exercise movements on action with real-time breathing and tempo cues.
+  - Simplified language across all screens (e.g. "Resting Energy" instead of "Basal Metabolic Rate", "Daily Burn" instead of "TDEE").

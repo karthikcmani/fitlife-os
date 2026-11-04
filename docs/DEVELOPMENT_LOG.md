@@ -215,3 +215,32 @@ This log tracks chronologically all major engineering operations, milestones ach
    - Verified that 100% of foreground pixels reside strictly within the Android 66% safe zone (0 clipped pixels).
    - Verified `npm test` passing with 114/114 tests and `npm run typecheck` passing with 0 errors.
    - Built fresh Android release APK via Gradle `assembleRelease`.
+
+---
+
+## [2026-11-05] — Personal Fitness Coach Transformation & UX De-Cluttering
+
+### Actions Executed:
+1. **Tab Navigation Redesign & "NO GLYPH" Permanent Resolution (`apps/mobile/`):**
+   - Diagnosed the device issue on Nothing Phone (3a): Missing tab icons and Unicode technical glyphs caused Android's system font renderer to display vertical fallback boxes labeled "NO GLYPH".
+   - Created `apps/mobile/src/components/ui/TabIcons.tsx` implementing pure React Native `<View>` vector tab icons (`HomeTabIcon`, `PlanTabIcon`, `ProgressTabIcon`, `ProfileTabIcon`). Zero font dependency, zero risk of missing font glyphs, and instantaneous 60fps rendering.
+   - Consolidated bottom navigation into 4 clean primary tabs: **Home**, **My Plan**, **Progress**, **Profile**. Hid secondary legacy screens (`workout`, `nutrition`, `vitals`) from bottom navigation tabs.
+2. **Animated Exercise Avatar Coach (`apps/mobile/src/components/coach/WorkoutAvatar.tsx`):**
+   - Built an interactive, continuous animated biomechanical avatar demonstrating exercises on action (Squats, Push-Ups, Forearm Planks, Glute Bridges, Rows/Pulls, Presses).
+   - Displays live phase tempo cues (Lowering: Inhale $\rightarrow$ Bottom Pause $\rightarrow$ Drive Up: Exhale).
+   - 100% offline, zero video asset bloat, 60fps smooth React Native `Animated` driver.
+3. **Equipment-Aware Plan Generation Engine (`packages/domain/src/coach/planGenerator.ts`):**
+   - Strict Home vs. Gym boundary: If the user selects "Home" with "No equipment / Bodyweight only", the engine strictly generates genuine bodyweight-only exercises. If dumbbells are selected, incorporates dumbbell movements.
+   - Daily nutrition recommendations with familiar Indian/Kerala portions (eggs, rotis, rice, dal, kadala curry, paneer, chicken).
+4. **Progress Tab Implementation (`apps/mobile/app/(tabs)/progress.tsx`):**
+   - Weight history tracker with real entries from `body_measurements`, delta indicator (+/- kg), and 1-tap logger.
+   - Weekly consistency counter (workouts completed vs. weekly goal).
+   - Real completed workout session list with zero fake data.
+5. **Profile Tab Simplification (`apps/mobile/app/(tabs)/profile.tsx`):**
+   - Replaced intimidating technical terms (BMR, TDEE, Physiological Calibration) with friendly beginner terminology ("Resting Energy", "Daily Burn").
+   - Added Active Plan Overview showing environment, equipment, and dietary preferences, with 1-tap re-calibration wizard.
+6. **Testing & Verification:**
+   - `npm run typecheck` across all 5 monorepo workspaces: **5/5 packages passed (0 errors)**.
+   - `npm test` across all workspaces: **7/7 test suites passed, 119/119 unit tests passed (exit code 0)**.
+   - Android Native Release Build: Executed `.\gradlew.bat assembleRelease` $\rightarrow$ **BUILD SUCCESSFUL in 1m 11s**.
+   - Generated release APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (Size: 96,095,409 bytes, SHA-256: `502DFD580678F5A724FC9BBFC427BE537AC59726AF39222A3A84E3883290E14A`).

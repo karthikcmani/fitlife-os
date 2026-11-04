@@ -14,6 +14,8 @@ import { Header } from '../../src/components/ui/Header';
 import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
 import { Button } from '../../src/components/ui/Button';
 import { useAuthStore, getStoredAccessToken } from '../../src/store/authStore';
+import { useCoachStore } from '../../src/store/coachStore';
+import { EquipmentItem } from '../../src/types';
 import { SyncManager } from '../../src/services/syncManager';
 import { localNotificationManager, LocalNotificationSchedule } from '../../src/services/localNotifications';
 import { theme } from '../../src/theme';
@@ -223,23 +225,45 @@ export default function ProfileScreen() {
 
             <View style={styles.gridRow}>
               <View style={styles.gridItem}>
-                <Text style={styles.metaLabel}>Basal Metabolic Rate</Text>
+                <Text style={styles.metaLabel}>Resting Energy (BMR)</Text>
                 <Text style={[styles.metaValue, { color: theme.colors.primary }]}>{bmr} kcal</Text>
+                <Text style={styles.metaHint}>Burned just staying alive</Text>
               </View>
               <View style={styles.gridItem}>
-                <Text style={styles.metaLabel}>Calculated TDEE</Text>
+                <Text style={styles.metaLabel}>Daily Burn (TDEE)</Text>
                 <Text style={[styles.metaValue, { color: theme.colors.secondary }]}>{tdee} kcal</Text>
+                <Text style={styles.metaHint}>Total burned with activity</Text>
               </View>
             </View>
 
+            {/* Goal, Environment & Equipment Card */}
             <View style={styles.goalBox}>
-              <Text style={styles.metaLabel}>Primary Fitness Goal</Text>
-              <Text style={styles.goalText}>{(profile?.primaryGoal ?? 'maintenance').toUpperCase().replace('_', ' ')}</Text>
-              <Text style={styles.envText}>Environment: {(profile?.trainingEnvironment ?? 'gym').toUpperCase()}</Text>
+              <Text style={styles.metaLabel}>Active Fitness Goal</Text>
+              <Text style={styles.goalText}>
+                {(profile?.primaryGoal ?? 'maintenance').toUpperCase().replace(/_/g, ' ')}
+              </Text>
+
+              <View style={styles.envEquipmentRow}>
+                <Text style={styles.envText}>
+                  📍 Location: {(profile?.trainingEnvironment ?? 'home').toUpperCase()}
+                </Text>
+                <Text style={styles.envText}>
+                  🛠 Equipment:{' '}
+                  {profile?.equipmentInventory?.includes('none')
+                    ? 'None (Bodyweight)'
+                    : profile?.equipmentInventory?.join(', ') || 'Bodyweight'}
+                </Text>
+                <Text style={styles.envText}>
+                  🥗 Diet:{' '}
+                  {profile?.dietaryPreference
+                    ? profile.dietaryPreference.replace(/_/g, ' ').toUpperCase()
+                    : 'STANDARD'}
+                </Text>
+              </View>
             </View>
 
             <Button
-              title="Recalibrate All Metrics (Wizard)"
+              title="Update Goal, Location & Equipment ⚙️"
               variant="secondary"
               onPress={() => router.push('/onboarding')}
               style={styles.recalBtn}
@@ -393,6 +417,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: 'uppercase',
   },
+  metaHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
   metaValue: {
     ...theme.typography.h2,
     color: theme.colors.textPrimary,
@@ -409,6 +439,10 @@ const styles = StyleSheet.create({
     ...theme.typography.bodyBold,
     color: theme.colors.textPrimary,
     marginTop: 2,
+  },
+  envEquipmentRow: {
+    marginTop: 6,
+    gap: 3,
   },
   envText: {
     ...theme.typography.caption,

@@ -243,4 +243,55 @@ export async function runLocalMigrations(db: SQLiteDatabase): Promise<void> {
       [Date.now()]
     );
   }
+
+  const applied3 = await db.getAllAsync<{ version: number }>(
+    `SELECT version FROM _local_migrations WHERE version = 3`
+  );
+
+  if (applied3.length === 0) {
+    try {
+      await db.execAsync(`
+        ALTER TABLE user_profiles ADD COLUMN session_duration_minutes INTEGER NOT NULL DEFAULT 30;
+        ALTER TABLE user_profiles ADD COLUMN equipment_inventory TEXT NOT NULL DEFAULT '["none"]';
+        ALTER TABLE user_profiles ADD COLUMN dietary_preference TEXT NOT NULL DEFAULT 'vegetarian';
+        ALTER TABLE user_profiles ADD COLUMN injuries_or_limitations TEXT NOT NULL DEFAULT '["none"]';
+        ALTER TABLE user_profiles ADD COLUMN body_measurements TEXT NOT NULL DEFAULT '{}';
+      `);
+    } catch {
+      // Columns may already exist
+    }
+
+    try {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS coaching_plans (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          primary_goal TEXT NOT NULL,
+          goal_title TEXT NOT NULL,
+          baseline_summary TEXT NOT NULL,
+          weekly_workouts TEXT NOT NULL,
+          daily_meals TEXT NOT NULL,
+          daily_water_target_ml INTEGER NOT NULL DEFAULT 2500,
+          progression_milestones TEXT NOT NULL,
+          why_plan TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        ALTER TABLE exercises ADD COLUMN breathing_guidance TEXT;
+        ALTER TABLE exercises ADD COLUMN starting_position TEXT;
+        ALTER TABLE exercises ADD COLUMN targeted_muscles_simple TEXT;
+        ALTER TABLE exercises ADD COLUMN why_included TEXT;
+        ALTER TABLE exercises ADD COLUMN harder_alternatives TEXT;
+      `);
+    } catch {
+      // May already exist
+    }
+
+    await db.runAsync(
+      `INSERT INTO _local_migrations (version, applied_at) VALUES (3, ?);`,
+      [Date.now()]
+    );
+  }
 }

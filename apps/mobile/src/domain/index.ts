@@ -5,3 +5,4 @@ export * from './ai/heuristicAdvisor';
 export * from './ai/dailyPlan';
 export * from './ai/friendlyAssistant';
 export * from './user/dob';
+export * from './coach/planGenerator';
