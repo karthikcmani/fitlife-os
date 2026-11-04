@@ -133,3 +133,48 @@ This log tracks chronologically all major engineering operations, milestones ach
 
 ### Status:
 - Application is 100% integrated, compiled, tested, and release-ready for Android and self-hosted backend deployment.
+
+---
+
+## [2026-11-04] — Personal Fitness Guidance Upgrade (`feat/personal-fitness-guide`)
+
+### Actions Executed:
+1. **Interactive Onboarding Redesign:**
+   - Implemented dynamic date of birth input (`DD/MM/YYYY`) with Gregorian leap year validation and exact age calculation.
+   - Captured fitness level (`beginner`, `intermediate`, `advanced`), training environment (`gym`, `home`, `calisthenics`), and available weekly training days.
+2. **Deterministic Offline AI Guidance Engine:**
+   - Implemented `dailyPlan.ts` with structured 4-pillar daily recommendations (Workout Focus, Calorie & Macro Target, Hydration Schedule, Daily Micro-Habit).
+   - Built conversational fitness assistant (`friendlyAssistant.ts`) explaining nutrition, recovery, and training in plain, non-intimidating language without cloud subscriptions.
+3. **Exercise Technique & Alternative Engine:**
+   - Seeded 40+ exercises with plain-language explanations, beginner cues, common mistakes, and beginner-friendly easier alternatives (e.g., Push-Up alternatives for Bench Press).
+
+---
+
+## [2026-11-04] — Real-Data Accuracy, Workout State Consistency, and Personalization Audit (`fix/real-data-accuracy`)
+
+### Actions Executed:
+1. **Physical Device Audit on Nothing Phone (3a):**
+   - Audited user interface states against physical screenshots; identified artificial sleep defaults, premature workout completion states, time-insensitive hydration advice, and opaque target calculations.
+2. **Elimination of Fake Biometrics:**
+   - Converted sleep duration and subjective quality in `vitals.tsx` to empty defaults (`''` and `null`).
+   - Implemented explicit empty states: `"No sleep recorded yet."` and `"Recovery Unavailable"` until measurements are recorded.
+   - Enforced validation requiring valid duration (0.5–24h) and quality rating.
+3. **Workout State Consistency & Lifecycle Integrity:**
+   - Updated `cancelWorkout()` in `workoutStore.ts` to soft-delete sessions and sets (`is_deleted = 1`) in SQLite.
+   - Auto-cleans stale unended sessions (>24h) and restores active in-progress sessions upon startup.
+   - Derives Dashboard workout status strictly from completed sessions with completed sets; added active `"In Progress: [Routine Title]"` with `"Resume Active Workout"` button.
+4. **Diurnal Time-Aware Hydration Guidance:**
+   - Engineered hour-aware hydration advice in `dailyPlan.ts` (Morning kickstart, Afternoon steady sips, Evening closure, Night tapering to prevent sleep disruption).
+5. **Caloric Target Transparency:**
+   - Added interactive explanation card on Nutrition screen showing Mifflin-St Jeor formula, TDEE multiplier, macro calorie validation ($4P + 4C + 9F$), safety floors, and non-medical wellness disclaimer.
+6. **Personalized Workout Calibration:**
+   - Replaced hardcoded 60 kg Barbell Bench Press default with environment- and experience-tailored starting exercises (e.g. Bodyweight Push-Up for Calisthenics, Goblet Squat 10 kg for Home, Lat Pulldown 25 kg for Gym Beginner).
+   - Added `ALL LEVELS`, `BEGINNER`, `INTERMEDIATE`, and `ADVANCED` difficulty filter chips.
+7. **Local Date & Age Math Verification:**
+   - Implemented `getLocalDateString()` to prevent UTC date rollbacks in non-GMT zones (such as IST UTC+5:30).
+   - Standardized `calculateAgeFromDob()` across all screens.
+8. **Verification & Release Compilation:**
+   - Automated tests: **114/114 tests passed** across all packages (`npm test`, exit code 0).
+   - TypeScript: **0 errors** across all 5 workspaces (`npm run typecheck`, exit code 0).
+   - Release APK compiled: `./gradlew assembleRelease` $\rightarrow$ **BUILD SUCCESSFUL in 1m 1s** (`app-release.apk`, 91.41 MB, SHA-256: `59D31889BFE180CD44E31F581CE0CB3A24DD8A61B7DB6A9E83FD4F68B6BDD680`).
+   - Documented audit in [`docs/REAL_DATA_ACCURACY_AUDIT.md`](file:///d:/FitLife-OS/docs/REAL_DATA_ACCURACY_AUDIT.md).

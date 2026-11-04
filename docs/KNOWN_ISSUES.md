@@ -58,3 +58,33 @@ This document logs architectural trade-offs, discovered technical risks, upstrea
 2. **Indian Food Recipe Variance:**
    - Regional preparations of dishes like "Sambar" or "Dal Tadka" vary substantially in oil, coconut, and dal proportions across South and North India.
    - *Design Boundary:* Provide baseline standard values based on ICMR-NIN IFCT 2017, but prominently feature a "Customize Recipe" action so users can save their exact family recipe.
+
+---
+
+## 4. Real-Data Integrity & Personalization Resolutions (Post-Hardware Audit)
+
+### 4.1 Synthetic Biometrics vs. Real User Measurements
+- **Issue Discovered on Device:** The Vitals screen initialized sleep logging with pre-filled `7.5 hours` and `4/5 quality`, evaluating a synthetic `92/100` recovery score before any sleep record was submitted.
+- **Resolution:** Initialized states to empty (`''` and `null`). Enforced explicit validation requiring duration (0.5–24h) and quality rating. Implemented clear empty states: `"No sleep recorded yet."` and `"Recovery Unavailable"` until valid measurements are saved.
+
+### 4.2 Workout State Divergence Between Dashboard and Workout Tab
+- **Issue Discovered on Device:** Dashboard displayed `"Workout Completed!"` while the Workout screen remained ready on `"Begin Workout Session"`.
+- **Root Cause:** Incomplete/cancelled sessions remained in SQLite with `ended_at = NULL`. The Dashboard evaluated workout presence solely on `startedAt.startsWith(dateStr)` without checking `endedAt` or verifying completed sets.
+- **Resolution:**
+  - `cancelWorkout()` marks session and sets as `is_deleted = 1` in SQLite.
+  - Active session restoration upon app launch.
+  - Stale sessions (>24h) auto-expire cleanly on startup.
+  - Dashboard completion requires `endedAt IS NOT NULL` and at least one completed set (`isCompleted = true`).
+  - Added visual in-progress banner with `"Resume Active Workout"`.
+
+### 4.3 Diurnal Hydration Guidance
+- **Issue Discovered on Device:** Daily plan engine delivered morning hydration recommendations at 7:31 PM.
+- **Resolution:** Introduced hour-aware diurnal recommendation engine (Morning 05:00–11:59, Afternoon 12:00–16:59, Evening 17:00–20:59, Night 21:00–04:59). Bedtime hours actively advise fluid tapering to protect sleep quality.
+
+### 4.4 Local Calendar Date Boundaries vs. UTC Offsets
+- **Issue Discovered on Device:** Formatting dates via `toISOString().split('T')[0]` caused premature day shifts for users in positive GMT zones (such as IST UTC+5:30).
+- **Resolution:** Implemented `getLocalDateString()` utilizing local device calendar methods (`getFullYear()`, `getMonth() + 1`, `getDate()`).
+
+### 4.5 Dynamic Age Derivation from Date of Birth
+- **Issue:** Naive `currentYear - birthYear` subtraction incorrectly aged users prior to their birthday in the current calendar year.
+- **Resolution:** Implemented `parseAndValidateDob()` and `calculateAgeFromDob()` supporting DD/MM/YYYY, leap-year boundary checking, and exact calendar birthday evaluation.
