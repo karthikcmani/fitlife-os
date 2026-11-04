@@ -36,6 +36,13 @@ export interface Exercise {
   isCustom: boolean;
   createdByUserId?: string;
   createdAt: string;
+  simpleExplanation?: string;
+  beginnerInstructions?: string;
+  commonMistakes?: string[];
+  easierAlternatives?: string[];
+  recommendedSets?: number;
+  recommendedReps?: string;
+  recommendedRestSec?: number;
 }
 
 export type SetType = 'warmup' | 'standard' | 'drop' | 'failure';

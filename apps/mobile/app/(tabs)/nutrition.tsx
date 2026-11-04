@@ -9,6 +9,13 @@ import { useNutritionStore } from '../../src/store/nutritionStore';
 import { useAuthStore } from '../../src/store/authStore';
 import { theme } from '../../src/theme';
 import { Food, MealType } from '../../src/types';
+import {
+  calculateMacronutrients,
+  calculateBmrMifflinStJeor,
+  calculateTdee,
+  calculateTargetCalories,
+  parseAndValidateDob,
+} from '../../src/domain';
 
 export default function NutritionScreen() {
   const { profile } = useAuthStore();
@@ -26,8 +33,43 @@ export default function NutritionScreen() {
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
   const [servingQuantity, setServingQuantity] = useState('1.0');
   const [dateStr] = useState(new Date().toISOString().split('T')[0]!);
+  const [showMacroInfo, setShowMacroInfo] = useState(false);
 
   const userId = profile?.userId ?? 'local_user';
+
+  // Dynamic nutrition targets scientifically calculated from user profile
+  const userWeight = profile?.currentWeightKg ?? 70;
+  const userHeight = profile?.heightCm ?? 175;
+  const userGoal = profile?.primaryGoal ?? 'general_fitness';
+  const userActivity = profile?.activityLevel ?? 'moderate';
+  const userGender = profile?.gender === 'female' ? 'female' : 'male';
+  const parsedDob = profile?.dateOfBirth ? parseAndValidateDob(profile.dateOfBirth) : null;
+  const userAge = parsedDob?.isValid && parsedDob.ageYears ? parsedDob.ageYears : 25;
+
+  const bmr = calculateBmrMifflinStJeor({
+    weightKg: userWeight,
+    heightCm: userHeight,
+    ageYears: userAge,
+    gender: userGender,
+  });
+  const tdee = calculateTdee(bmr, userActivity);
+  const targetCalResult = calculateTargetCalories({
+    tdee,
+    goal: userGoal,
+    gender: userGender,
+  });
+  const targetCalories = targetCalResult.targetCalories;
+
+  const targets = calculateMacronutrients({
+    targetCalories,
+    weightKg: userWeight,
+    goal: userGoal,
+  });
+
+  const targetProtein = targets.proteinG;
+  const targetCarbs = targets.carbsG;
+  const targetFat = targets.fatG;
+  const targetFiber = 28;
 
   useEffect(() => {
     loadTodayNutrition(userId, dateStr);
@@ -52,28 +94,75 @@ export default function NutritionScreen() {
 
     setSelectedFood(null);
     setSearchQuery('');
+    setServingQuantity('1.0');
     searchFoods('');
   };
 
   // Indian quick-add shortcuts
   const handleQuickAdd = async (foodName: string) => {
+    setSearchQuery(foodName);
     await searchFoods(foodName);
   };
+
+  const caloriesRemaining = Math.max(0, targetCalories - dailyTotals.calories);
+  const proteinGap = Math.max(0, targetProtein - dailyTotals.proteinG);
 
   return (
     <ScreenContainer>
       <Header
-        title="Nutrition Engine"
-        subtitle={`Daily Intake • ${dailyTotals.calories} kcal`}
+        title="Nutrition Guide"
+        subtitle={`Daily Intake • ${dailyTotals.calories} of ${targetCalories} kcal`}
       />
 
-      {/* 1. Daily Macronutrient Summary Card */}
+      {/* 1. Friendly Daily Intake Summary */}
       <SurfaceCard elevated>
-        <Text style={styles.sectionHeading}>Daily Macro Balance</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.sectionHeading}>Daily Intake Overview</Text>
+          <TouchableOpacity onPress={() => setShowMacroInfo(!showMacroInfo)}>
+            <Text style={styles.infoLink}>{showMacroInfo ? 'Hide Guide' : 'What do these mean?'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.coachText}>
+          {caloriesRemaining > 0
+            ? `You have about ${caloriesRemaining} kcal left today to meet your daily target.`
+            : `You've reached your daily calorie target (${dailyTotals.calories} kcal). Fuel up on water and rest!`}
+        </Text>
+
+        {proteinGap > 15 ? (
+          <View style={styles.tipBox}>
+            <Text style={styles.tipTitle}>💡 Coach Protein Tip:</Text>
+            <Text style={styles.tipText}>
+              You need {Math.round(proteinGap)}g more protein today. Add a cup of dal, boiled eggs, curd/yogurt, kadala curry, or paneer to your next meal.
+            </Text>
+          </View>
+        ) : null}
+
+        {showMacroInfo && (
+          <View style={styles.macroExplainerBox}>
+            <Text style={styles.explainerItem}>
+              <Text style={{ fontWeight: '700', color: theme.colors.primary }}>Protein: </Text>
+              Builds and repairs muscle tissue and keeps you feeling full for longer.
+            </Text>
+            <Text style={styles.explainerItem}>
+              <Text style={{ fontWeight: '700', color: theme.colors.secondary }}>Carbohydrates: </Text>
+              Your body and brain's primary daily energy source for workouts and daily tasks.
+            </Text>
+            <Text style={styles.explainerItem}>
+              <Text style={{ fontWeight: '700', color: theme.colors.warning }}>Fats: </Text>
+              Crucial for hormone production, vitamin absorption, and joint health.
+            </Text>
+            <Text style={styles.explainerItem}>
+              <Text style={{ fontWeight: '700', color: theme.colors.accent }}>Fiber: </Text>
+              Aids digestion, gut health, and stabilizes blood sugar.
+            </Text>
+          </View>
+        )}
+
         <ProgressBar
           label="Protein"
           current={dailyTotals.proteinG}
-          target={150}
+          target={targetProtein}
           unit="g"
           color={theme.colors.primary}
           height={8}
@@ -81,7 +170,7 @@ export default function NutritionScreen() {
         <ProgressBar
           label="Carbohydrates"
           current={dailyTotals.carbsG}
-          target={220}
+          target={targetCarbs}
           unit="g"
           color={theme.colors.secondary}
           height={8}
@@ -89,7 +178,7 @@ export default function NutritionScreen() {
         <ProgressBar
           label="Dietary Fat"
           current={dailyTotals.fatG}
-          target={55}
+          target={targetFat}
           unit="g"
           color={theme.colors.warning}
           height={8}
@@ -97,18 +186,34 @@ export default function NutritionScreen() {
         <ProgressBar
           label="Fiber"
           current={dailyTotals.fiberG}
-          target={28}
+          target={targetFiber}
           unit="g"
           color={theme.colors.accent}
           height={8}
         />
       </SurfaceCard>
 
-      {/* 2. Indian Food Quick-Add Shortcuts */}
+      {/* 2. Indian & Familiar Staples Quick-Add */}
       <SurfaceCard>
-        <Text style={styles.sectionHeading}>Indian Regional Staples (Quick Search)</Text>
+        <Text style={styles.sectionHeading}>Familiar Everyday Foods</Text>
+        <Text style={styles.subtext}>Tap any staple to search and log quickly:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
-          {['Idli', 'Dosa', 'Sambar', 'Roti', 'Curd', 'Paneer', 'Rice', 'Dal', 'Egg'].map((item) => (
+          {[
+            'Puttu',
+            'Appam',
+            'Kadala Curry',
+            'Fish Curry',
+            'Dal',
+            'Sambar',
+            'Curd',
+            'Paneer',
+            'Rice',
+            'Roti',
+            'Egg',
+            'Chicken Curry',
+            'Avial',
+            'Banana',
+          ].map((item) => (
             <TouchableOpacity
               key={item}
               style={styles.quickChip}
@@ -120,9 +225,9 @@ export default function NutritionScreen() {
         </ScrollView>
       </SurfaceCard>
 
-      {/* 3. Food Search & Logging Interface */}
+      {/* 3. Food Search & Household Portion Logging */}
       <SurfaceCard>
-        <Text style={styles.sectionHeading}>Log Meal Item</Text>
+        <Text style={styles.sectionHeading}>Log Food</Text>
 
         {/* Meal Type Selector */}
         <View style={styles.mealTypeRow}>
@@ -181,13 +286,46 @@ export default function NutritionScreen() {
           </View>
         ) : null}
 
-        {/* Selected Food Confirmation */}
+        {/* Selected Food Confirmation & Household Portions */}
         {selectedFood ? (
           <View style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>Selected: {selectedFood.name}</Text>
+            <Text style={styles.confirmSub}>
+              Standard portion: 1 {selectedFood.servingUnitName} ({selectedFood.servingSizeG}g) = {selectedFood.calories} kcal, {selectedFood.proteinG}g protein
+            </Text>
+
+            {/* Quick Household Quantity Chips */}
+            <Text style={styles.portionLabel}>Choose Portion Size:</Text>
+            <View style={styles.portionChipsRow}>
+              {[
+                { label: 'Half (0.5)', value: '0.5' },
+                { label: 'Standard (1.0)', value: '1.0' },
+                { label: 'Generous (1.5)', value: '1.5' },
+                { label: 'Double (2.0)', value: '2.0' },
+              ].map((p) => (
+                <TouchableOpacity
+                  key={p.value}
+                  style={[
+                    styles.portionChip,
+                    servingQuantity === p.value && styles.activePortionChip,
+                  ]}
+                  onPress={() => setServingQuantity(p.value)}
+                >
+                  <Text
+                    style={[
+                      styles.portionChipText,
+                      servingQuantity === p.value && styles.activePortionChipText,
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <View style={styles.quantityRow}>
               <Text style={styles.inputLabel}>
-                Quantity ({selectedFood.servingUnitName}s):
+                Custom Quantity ({selectedFood.servingUnitName}s):
               </Text>
               <TextInput
                 style={styles.quantityInput}
@@ -215,7 +353,7 @@ export default function NutritionScreen() {
       <SurfaceCard>
         <Text style={styles.sectionHeading}>Today's Logged Meals</Text>
         {todayMeals.length === 0 ? (
-          <Text style={styles.emptyText}>No food logged yet today.</Text>
+          <Text style={styles.emptyText}>No food logged yet today. Tap a staple above or search to start!</Text>
         ) : (
           todayMeals.map((meal) => (
             <View key={meal.id} style={styles.mealCard}>
@@ -223,7 +361,7 @@ export default function NutritionScreen() {
               {meal.items.map((it) => (
                 <View key={it.id} style={styles.itemRow}>
                   <Text style={styles.itemName}>
-                    {it.foodName ?? 'Food Item'} ({it.servings} serving)
+                    {it.foodName ?? 'Food Item'} ({it.servings} {it.servings === 1 ? 'serving' : 'servings'})
                   </Text>
                   <Text style={styles.itemCal}>{it.calculatedCalories} kcal</Text>
                 </View>
@@ -237,10 +375,63 @@ export default function NutritionScreen() {
 }
 
 const styles = StyleSheet.create({
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
   sectionHeading: {
     ...theme.typography.h3,
     color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
+  },
+  infoLink: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+  },
+  coachText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
+    lineHeight: 20,
+  },
+  subtext: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.sm,
+  },
+  tipBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary,
     marginBottom: theme.spacing.md,
+  },
+  tipTitle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+    marginBottom: 2,
+  },
+  tipText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  macroExplainerBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.xs,
+  },
+  explainerItem: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
   quickRow: {
     flexDirection: 'row',
@@ -249,27 +440,27 @@ const styles = StyleSheet.create({
   quickChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.full,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginRight: 8,
+    marginRight: theme.spacing.xs,
   },
   quickChipText: {
     ...theme.typography.captionBold,
-    color: theme.colors.textSecondary,
+    color: theme.colors.textPrimary,
   },
   mealTypeRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: theme.spacing.xs,
     marginBottom: theme.spacing.md,
   },
   mealTypeBtn: {
     flex: 1,
     paddingVertical: 8,
+    alignItems: 'center',
     borderRadius: theme.borderRadius.sm,
     backgroundColor: theme.colors.surfaceElevated,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -278,26 +469,26 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
   },
   mealTypeText: {
-    ...theme.typography.caption,
-    fontSize: 10,
-    fontWeight: '700',
+    ...theme.typography.captionBold,
     color: theme.colors.textSecondary,
   },
   activeMealTypeText: {
-    color: theme.colors.textInverse,
+    color: theme.colors.background,
   },
   searchBar: {
     backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    color: theme.colors.textPrimary,
     padding: theme.spacing.md,
-    fontSize: 14,
+    color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
   resultsBox: {
-    gap: 6,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     marginBottom: theme.spacing.md,
   },
   resultItem: {
@@ -305,13 +496,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: theme.spacing.md,
-    backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: theme.borderRadius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   selectedResultItem: {
-    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
   },
   foodName: {
     ...theme.typography.bodyBold,
@@ -320,52 +509,85 @@ const styles = StyleSheet.create({
   foodPortion: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginTop: 2,
   },
   macroSnippet: {
-    ...theme.typography.caption,
+    ...theme.typography.captionBold,
     color: theme.colors.primary,
-    fontWeight: '600',
   },
   confirmBox: {
     backgroundColor: theme.colors.surfaceElevated,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    marginTop: theme.spacing.xs,
+    borderColor: theme.colors.primary,
+    marginBottom: theme.spacing.md,
   },
   confirmTitle: {
-    ...theme.typography.bodyBold,
+    ...theme.typography.h3,
     color: theme.colors.textPrimary,
+  },
+  confirmSub: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 2,
     marginBottom: theme.spacing.sm,
+  },
+  portionLabel: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textSecondary,
+    marginBottom: 6,
+  },
+  portionChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+  },
+  portionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  activePortionChip: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary,
+  },
+  portionChipText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+  },
+  activePortionChipText: {
+    color: theme.colors.background,
+    fontWeight: '700',
   },
   quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.sm,
+    marginVertical: theme.spacing.xs,
   },
   inputLabel: {
-    ...theme.typography.captionBold,
+    ...theme.typography.body,
     color: theme.colors.textSecondary,
   },
   quantityInput: {
     backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    color: theme.colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.sm,
-    width: 80,
+    padding: theme.spacing.xs,
+    width: 70,
     textAlign: 'center',
-    fontSize: 16,
+    color: theme.colors.textPrimary,
   },
   calculatedText: {
-    ...theme.typography.captionBold,
-    color: theme.colors.warning,
-    marginBottom: theme.spacing.md,
+    ...theme.typography.bodyBold,
+    color: theme.colors.primary,
+    marginVertical: theme.spacing.sm,
+    textAlign: 'center',
   },
   addBtn: {
     marginTop: theme.spacing.xs,
@@ -373,14 +595,13 @@ const styles = StyleSheet.create({
   emptyText: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
   mealCard: {
     backgroundColor: theme.colors.surfaceElevated,
-    padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   mealHeading: {
     ...theme.typography.captionBold,
@@ -390,12 +611,13 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 3,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   itemName: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    flex: 1,
   },
   itemCal: {
     ...theme.typography.bodyBold,

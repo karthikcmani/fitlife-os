@@ -206,4 +206,41 @@ export async function runLocalMigrations(db: SQLiteDatabase): Promise<void> {
       [Date.now()]
     );
   }
+
+  const applied2 = await db.getAllAsync<{ version: number }>(
+    `SELECT version FROM _local_migrations WHERE version = 2`
+  );
+
+  if (applied2.length === 0) {
+    try {
+      await db.execAsync(`
+        ALTER TABLE user_profiles ADD COLUMN available_training_days INTEGER NOT NULL DEFAULT 3;
+      `);
+    } catch {
+      // Column may already exist
+    }
+
+    try {
+      await db.execAsync(`
+        ALTER TABLE exercises ADD COLUMN simple_explanation TEXT;
+        ALTER TABLE exercises ADD COLUMN beginner_instructions TEXT;
+        ALTER TABLE exercises ADD COLUMN common_mistakes TEXT;
+        ALTER TABLE exercises ADD COLUMN easier_alternatives TEXT;
+        ALTER TABLE exercises ADD COLUMN recommended_sets INTEGER DEFAULT 3;
+        ALTER TABLE exercises ADD COLUMN recommended_reps TEXT DEFAULT '8-12 reps';
+        ALTER TABLE exercises ADD COLUMN recommended_rest_sec INTEGER DEFAULT 60;
+      `);
+    } catch {
+      // Columns may already exist
+    }
+
+    // Refresh exercises and foods catalog with expanded familiar Indian/Kerala foods and beginner exercise cues
+    await seedExercises(db);
+    await seedFoods(db);
+
+    await db.runAsync(
+      `INSERT INTO _local_migrations (version, applied_at) VALUES (2, ?);`,
+      [Date.now()]
+    );
+  }
 }

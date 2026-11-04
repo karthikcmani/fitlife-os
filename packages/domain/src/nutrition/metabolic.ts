@@ -145,8 +145,13 @@ export function calculateTargetCalories(params: TargetCalorieParams): TargetCalo
         adjustmentPercent = 0.15;
       }
       break;
-    case 'recomposition':
     case 'strength':
+    case 'stamina':
+      adjustmentPercent = 0.05; // Modest 5% support for strength progression & endurance
+      break;
+    case 'recomposition':
+    case 'general_fitness':
+    case 'health_consistency':
     case 'maintenance':
     default:
       adjustmentPercent = 0;
@@ -201,6 +206,9 @@ export function calculateMacronutrients(params: MacroPartitionParams): MacroPart
       case 'strength':
         proteinGPerKg = 1.8;
         break;
+      case 'stamina':
+      case 'general_fitness':
+      case 'health_consistency':
       case 'maintenance':
       default:
         proteinGPerKg = 1.6;

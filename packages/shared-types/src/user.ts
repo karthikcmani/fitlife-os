@@ -14,7 +14,10 @@ export type PrimaryGoal =
   | 'muscle_gain'
   | 'recomposition'
   | 'strength'
-  | 'maintenance';
+  | 'maintenance'
+  | 'general_fitness'
+  | 'stamina'
+  | 'health_consistency';
 
 export type TrainingEnvironment = 'gym' | 'home' | 'calisthenics';
 
@@ -31,6 +34,7 @@ export interface UserProfile {
   activityLevel: ActivityLevel;
   primaryGoal: PrimaryGoal;
   trainingEnvironment: TrainingEnvironment;
+  availableTrainingDays?: number; // 2 to 6 days per week
   preferredUnitSystem: UnitSystem;
   dailyWaterTargetMl: number;
   createdAt: string;
@@ -47,6 +51,7 @@ export interface ProfileSetupInput {
   activityLevel: ActivityLevel;
   primaryGoal: PrimaryGoal;
   trainingEnvironment: TrainingEnvironment;
+  availableTrainingDays?: number;
   preferredUnitSystem?: UnitSystem;
   dailyWaterTargetMl?: number;
 }

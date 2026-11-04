@@ -31,6 +31,8 @@ export default function WorkoutScreen() {
   // Set Logging State
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>('barbell-bench-press');
   const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [showWarmupGuide, setShowWarmupGuide] = useState(false);
+  const [showCooldownGuide, setShowCooldownGuide] = useState(false);
   const [inputWeight, setInputWeight] = useState('60');
   const [inputReps, setInputReps] = useState('8');
   const [inputRpe, setInputRpe] = useState('8');
@@ -54,6 +56,15 @@ export default function WorkoutScreen() {
     await addSetToActive(selectedExerciseId, weight, reps, rpe);
   };
 
+  const handleSelectAlternative = (altName: string) => {
+    const match = exercises.find(
+      (e) => e.name.toLowerCase().includes(altName.toLowerCase()) || altName.toLowerCase().includes(e.name.toLowerCase())
+    );
+    if (match) {
+      setSelectedExerciseId(match.id);
+    }
+  };
+
   const selectedExercise = exercises.find((e) => e.id === selectedExerciseId);
   const current1Rm =
     parseFloat(inputWeight) > 0 && parseInt(inputReps, 10) > 0
@@ -63,9 +74,31 @@ export default function WorkoutScreen() {
   return (
     <ScreenContainer>
       <Header
-        title="Workout Engine"
-        subtitle={activeSession ? 'Active Session in Progress' : 'Plan & Record Your Training'}
+        title="Workout Guide"
+        subtitle={activeSession ? 'Active Session in Progress' : 'Guided Training & Exercise Technique'}
       />
+
+      {/* 5-Min Warm-Up Routine Box */}
+      <SurfaceCard>
+        <TouchableOpacity
+          style={styles.routineHeaderRow}
+          onPress={() => setShowWarmupGuide(!showWarmupGuide)}
+        >
+          <Text style={styles.routineTitle}>🔥 Pre-Workout Warm-Up (5 Mins)</Text>
+          <Text style={styles.expandToggle}>{showWarmupGuide ? '▲ Hide' : '▼ View Steps'}</Text>
+        </TouchableOpacity>
+        {showWarmupGuide && (
+          <View style={styles.routineContent}>
+            <Text style={styles.routineText}>
+              Perform each movement for 45-60 seconds to raise core temperature and lubricate joints:
+            </Text>
+            <Text style={styles.routineStep}>1. Arm circles & shoulder rolls (forward and backward)</Text>
+            <Text style={styles.routineStep}>2. Bodyweight air squats (15 controlled reps)</Text>
+            <Text style={styles.routineStep}>3. Torso twists and cat-cow spine mobility</Text>
+            <Text style={styles.routineStep}>4. Light marching or jumping jacks (60 seconds)</Text>
+          </View>
+        )}
+      </SurfaceCard>
 
       {/* ACTIVE WORKOUT MODE */}
       {activeSession ? (
@@ -113,6 +146,58 @@ export default function WorkoutScreen() {
                     <Text style={styles.dropdownSub}>{ex.primaryMuscleGroup} • {ex.equipmentRequired}</Text>
                   </TouchableOpacity>
                 ))}
+              </View>
+            )}
+
+            {/* Beginner Coach Guidance Card for Current Exercise */}
+            {selectedExercise && (
+              <View style={styles.coachExerciseCard}>
+                {selectedExercise.simpleExplanation ? (
+                  <Text style={styles.simpleExplanation}>
+                    💡 <Text style={{ fontWeight: '700' }}>What this does:</Text> {selectedExercise.simpleExplanation}
+                  </Text>
+                ) : null}
+
+                {selectedExercise.beginnerInstructions ? (
+                  <View style={styles.cueBox}>
+                    <Text style={styles.cueTitle}>🎯 Form Cues:</Text>
+                    <Text style={styles.cueText}>{selectedExercise.beginnerInstructions}</Text>
+                  </View>
+                ) : null}
+
+                {selectedExercise.commonMistakes && selectedExercise.commonMistakes.length > 0 ? (
+                  <View style={styles.mistakeBox}>
+                    <Text style={styles.mistakeTitle}>⚠️ Avoid this mistake:</Text>
+                    {selectedExercise.commonMistakes.map((m, idx) => (
+                      <Text key={idx} style={styles.mistakeText}>• {m}</Text>
+                    ))}
+                  </View>
+                ) : null}
+
+                <View style={styles.targetRow}>
+                  <Text style={styles.targetBadge}>
+                    Recommended: {selectedExercise.recommendedSets ?? 3} sets × {selectedExercise.recommendedReps ?? '8-12'} reps
+                  </Text>
+                  <Text style={styles.targetBadge}>
+                    Rest: {selectedExercise.recommendedRestSec ?? 90}s
+                  </Text>
+                </View>
+
+                {selectedExercise.easierAlternatives && selectedExercise.easierAlternatives.length > 0 ? (
+                  <View style={styles.targetRow}>
+                    {selectedExercise.easierAlternatives.map((alt, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.altChip}
+                        onPress={() => handleSelectAlternative(alt)}
+                      >
+                        <Text style={styles.altChipText}>
+                          Feeling heavy? Switch to: {alt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             )}
 
@@ -272,6 +357,72 @@ export default function WorkoutScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Selected Exercise Technique Detail Card */}
+            {selectedExercise && (
+              <View style={styles.libraryDetailCard}>
+                <Text style={styles.libraryDetailTitle}>📖 {selectedExercise.name} Form Guide</Text>
+                {selectedExercise.simpleExplanation ? (
+                  <Text style={styles.simpleExplanation}>
+                    💡 {selectedExercise.simpleExplanation}
+                  </Text>
+                ) : null}
+                {selectedExercise.beginnerInstructions ? (
+                  <View style={styles.cueBox}>
+                    <Text style={styles.cueTitle}>🎯 Beginner Steps:</Text>
+                    <Text style={styles.cueText}>{selectedExercise.beginnerInstructions}</Text>
+                  </View>
+                ) : null}
+                {selectedExercise.commonMistakes && selectedExercise.commonMistakes.length > 0 ? (
+                  <View style={styles.mistakeBox}>
+                    <Text style={styles.mistakeTitle}>⚠️ Common Mistake:</Text>
+                    {selectedExercise.commonMistakes.map((m, idx) => (
+                      <Text key={idx} style={styles.mistakeText}>• {m}</Text>
+                    ))}
+                  </View>
+                ) : null}
+                <View style={styles.targetRow}>
+                  <Text style={styles.targetBadge}>
+                    Sets: {selectedExercise.recommendedSets ?? 3} | Reps: {selectedExercise.recommendedReps ?? '8-12'}
+                  </Text>
+                  {selectedExercise.easierAlternatives && selectedExercise.easierAlternatives.length > 0 ? (
+                    selectedExercise.easierAlternatives.map((alt, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.altChip}
+                        onPress={() => handleSelectAlternative(alt)}
+                      >
+                        <Text style={styles.altChipText}>
+                          Easier: {alt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : null}
+                </View>
+              </View>
+            )}
+          </SurfaceCard>
+
+          {/* 5-Min Post-Workout Cool-Down Box */}
+          <SurfaceCard>
+            <TouchableOpacity
+              style={styles.routineHeaderRow}
+              onPress={() => setShowCooldownGuide(!showCooldownGuide)}
+            >
+              <Text style={styles.routineTitle}>❄️ Post-Workout Cool-Down (5 Mins)</Text>
+              <Text style={styles.expandToggle}>{showCooldownGuide ? '▲ Hide' : '▼ View Steps'}</Text>
+            </TouchableOpacity>
+            {showCooldownGuide && (
+              <View style={styles.routineContent}>
+                <Text style={styles.routineText}>
+                  Gentle static stretches to bring heart rate down and reduce muscle soreness:
+                </Text>
+                <Text style={styles.routineStep}>1. Standing chest & bicep wall stretch (30s per side)</Text>
+                <Text style={styles.routineStep}>2. Seated or standing hamstring reach (30s hold)</Text>
+                <Text style={styles.routineStep}>3. Standing quadriceps stretch (30s each leg)</Text>
+                <Text style={styles.routineStep}>4. Slow diaphragmatic breathing (4s in, 6s out for 2 mins)</Text>
+              </View>
+            )}
           </SurfaceCard>
 
           {/* Past History */}
@@ -559,6 +710,121 @@ const styles = StyleSheet.create({
   },
   histSets: {
     ...theme.typography.body,
+    color: theme.colors.primary,
+  },
+  routineHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  routineTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textPrimary,
+  },
+  expandToggle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+  },
+  routineContent: {
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    gap: 6,
+  },
+  routineText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: 4,
+  },
+  routineStep: {
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  coachExerciseCard: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.secondary,
+    marginBottom: theme.spacing.md,
+    gap: 6,
+  },
+  libraryDetailCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    marginTop: theme.spacing.md,
+    gap: 6,
+  },
+  libraryDetailTitle: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.primary,
+  },
+  simpleExplanation: {
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    lineHeight: 18,
+  },
+  cueBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+  },
+  cueTitle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.secondary,
+    marginBottom: 2,
+  },
+  cueText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
+  },
+  mistakeBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+  },
+  mistakeTitle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.warning,
+    marginBottom: 2,
+  },
+  mistakeText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
+  },
+  targetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  targetBadge: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.sm,
+  },
+  altChip: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.sm,
+  },
+  altChipText: {
+    ...theme.typography.captionBold,
     color: theme.colors.primary,
   },
 });

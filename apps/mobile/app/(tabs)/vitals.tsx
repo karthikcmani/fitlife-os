@@ -78,7 +78,7 @@ export default function VitalsScreen() {
       {/* 1. Hydration Tracker */}
       <SurfaceCard elevated>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Hydration Tracking</Text>
+          <Text style={styles.cardTitle}>Daily Hydration</Text>
           <Text style={styles.waterHighlight}>
             {(todayWaterMl / 1000).toFixed(2)}L / {(waterTarget / 1000).toFixed(2)}L
           </Text>
@@ -99,6 +99,12 @@ export default function VitalsScreen() {
             style={styles.quickAddBtn}
           />
           <Button
+            title="+300 ml (Cup)"
+            onPress={() => addWater(userId, 300)}
+            variant="secondary"
+            style={styles.quickAddBtn}
+          />
+          <Button
             title="+500 ml (Bottle)"
             onPress={() => addWater(userId, 500)}
             variant="secondary"
@@ -111,14 +117,28 @@ export default function VitalsScreen() {
             style={styles.quickAddBtn}
           />
         </View>
+
+        {/* Suggested Hydration Schedule */}
+        <View style={styles.hydrationScheduleBox}>
+          <Text style={styles.scheduleTitle}>⏰ Recommended Daily Hydration Routine:</Text>
+          <Text style={styles.scheduleItem}>• <Text style={{ fontWeight: '700' }}>Wake-up:</Text> 500ml to kickstart digestion and alert the nervous system.</Text>
+          <Text style={styles.scheduleItem}>• <Text style={{ fontWeight: '700' }}>Before Meals:</Text> 250ml ~30 mins before food for smooth digestion.</Text>
+          <Text style={styles.scheduleItem}>• <Text style={{ fontWeight: '700' }}>Training:</Text> 250-500ml sipped throughout your workout session.</Text>
+          <Text style={styles.scheduleItem}>• <Text style={{ fontWeight: '700' }}>Evening:</Text> 250ml, tapering off 2 hours before bed for sound sleep.</Text>
+        </View>
       </SurfaceCard>
 
       {/* 2. Daily Habits Checklist */}
       <SurfaceCard>
-        <Text style={styles.sectionHeading}>Daily Habits & Routines</Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.sectionHeading}>Daily Habits & Consistency</Text>
+        </View>
+        <Text style={styles.habitEncourageText}>
+          Consistency beats intensity. Missing a day is completely normal—just aim for progress over perfection!
+        </Text>
 
         {habits.length === 0 ? (
-          <Text style={styles.emptyText}>No habits created yet.</Text>
+          <Text style={styles.emptyText}>No habits created yet. Start with simple goals like "Drink 2L water" or "10-minute walk".</Text>
         ) : (
           habits.map((habit) => {
             const isCompleted = completedHabitIds.includes(habit.id);
@@ -168,13 +188,17 @@ export default function VitalsScreen() {
       {/* 3. Sleep & Recovery Log */}
       <SurfaceCard>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Sleep & Recovery</Text>
+          <Text style={styles.cardTitle}>Sleep & Recovery Insight</Text>
           {recovery ? (
             <Text style={styles.recoveryBadge}>
               Score: {recovery.score}/100 ({recovery.rating.toUpperCase()})
             </Text>
           ) : null}
         </View>
+
+        <Text style={styles.sleepGuideText}>
+          Target: 7-9 hours nightly allows optimal muscle tissue repair and hormonal balance. FITLIFE OS calculates wellness readiness estimates; not intended for medical diagnosis.
+        </Text>
 
         <View style={styles.sleepInputRow}>
           <View style={styles.sleepCol}>
@@ -221,7 +245,7 @@ export default function VitalsScreen() {
 
         {recovery ? (
           <View style={styles.feedbackBox}>
-            <Text style={styles.feedbackTitle}>Physiological Readiness Insight:</Text>
+            <Text style={styles.feedbackTitle}>Coach Recovery Guidance:</Text>
             {recovery.recommendations.map((rec, idx) => (
               <Text key={idx} style={styles.feedbackText}>
                 • {rec}
@@ -257,6 +281,37 @@ const styles = StyleSheet.create({
   quickAddBtn: {
     flex: 1,
     paddingHorizontal: 4,
+  },
+  hydrationScheduleBox: {
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.secondary,
+    gap: 4,
+  },
+  scheduleTitle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.secondary,
+    marginBottom: 4,
+  },
+  scheduleItem: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  habitEncourageText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.md,
+    lineHeight: 18,
+  },
+  sleepGuideText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.md,
+    lineHeight: 18,
   },
   sectionHeading: {
     ...theme.typography.h3,

@@ -2,7 +2,7 @@ import { SQLiteDatabase } from 'expo-sqlite';
 
 export async function seedFoods(db: SQLiteDatabase): Promise<void> {
   const foods = [
-    // South Indian staples
+    // South Indian & Kerala Staples
     {
       id: 'food-idli',
       name: 'Idli (Steamed Rice & Urad Dal Cake)',
@@ -19,7 +19,7 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
     },
     {
       id: 'food-plain-dosa',
-      name: 'Plain Dosa (Fermented Crepe)',
+      name: 'Plain Dosa (Fermented Crispy Crepe)',
       brand: 'Home / Traditional',
       region: 'indian_south',
       serving_size_g: 80, // 1 medium dosa
@@ -32,12 +32,82 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
       data_source: 'COMMUNITY_RECIPE',
     },
     {
+      id: 'food-kerala-puttu',
+      name: 'Kerala Puttu (Steamed Rice Flour & Coconut Cylinder)',
+      brand: 'Traditional Kerala',
+      region: 'indian_south',
+      serving_size_g: 100, // 1 medium piece (1/2 cheratta)
+      serving_unit_name: 'piece',
+      calories: 160,
+      protein_g: 3.5,
+      carbs_g: 31.0,
+      fat_g: 2.8,
+      fiber_g: 2.1,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
+      id: 'food-kerala-appam',
+      name: 'Appam / Palappam (Fermented Rice & Coconut Milk Pancake)',
+      brand: 'Traditional Kerala',
+      region: 'indian_south',
+      serving_size_g: 60, // 1 appam
+      serving_unit_name: 'piece',
+      calories: 110,
+      protein_g: 1.8,
+      carbs_g: 21.0,
+      fat_g: 2.2,
+      fiber_g: 0.9,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
+      id: 'food-kerala-kadala-curry',
+      name: 'Kadala Curry (Black Chickpeas in Roasted Coconut Gravy)',
+      brand: 'Traditional Kerala',
+      region: 'indian_south',
+      serving_size_g: 150, // 1 bowl
+      serving_unit_name: 'bowl',
+      calories: 185,
+      protein_g: 8.5,
+      carbs_g: 23.0,
+      fat_g: 6.8,
+      fiber_g: 5.5,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
+      id: 'food-kerala-fish-curry',
+      name: 'Kerala Fish Curry (Meen Curry with Kudampuli)',
+      brand: 'Traditional Kerala',
+      region: 'indian_south',
+      serving_size_g: 150, // 1 bowl with fish piece
+      serving_unit_name: 'bowl',
+      calories: 175,
+      protein_g: 19.5,
+      carbs_g: 3.5,
+      fat_g: 9.2,
+      fiber_g: 1.0,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
+      id: 'food-kerala-fish-fry',
+      name: 'Fish Fry (Shallow-Fried Sardine / Mackerel with Spices)',
+      brand: 'Traditional Kerala',
+      region: 'indian_south',
+      serving_size_g: 80, // 1 medium piece
+      serving_unit_name: 'piece',
+      calories: 155,
+      protein_g: 18.0,
+      carbs_g: 1.8,
+      fat_g: 8.5,
+      fiber_g: 0.5,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
       id: 'food-sambar',
-      name: 'South Indian Sambar (Toor Dal & Vegetables)',
+      name: 'South Indian Sambar (Toor Dal, Drumsticks & Vegetables)',
       brand: 'Home / Traditional',
       region: 'indian_south',
-      serving_size_g: 150, // 1 small katori (150 ml)
-      serving_unit_name: 'katori',
+      serving_size_g: 150, // 1 bowl
+      serving_unit_name: 'bowl',
       calories: 110,
       protein_g: 4.5,
       carbs_g: 16.8,
@@ -46,12 +116,26 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
       data_source: 'COMMUNITY_RECIPE',
     },
     {
+      id: 'food-avial',
+      name: 'Avial (Mixed Vegetables in Coconut & Curd Gravy)',
+      brand: 'Traditional Kerala',
+      region: 'indian_south',
+      serving_size_g: 150, // 1 bowl
+      serving_unit_name: 'bowl',
+      calories: 135,
+      protein_g: 3.2,
+      carbs_g: 12.5,
+      fat_g: 8.0,
+      fiber_g: 4.0,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
       id: 'food-curd-dahi',
       name: 'Curd / Dahi (Plain Whole Milk Yogurt)',
       brand: 'Home / Dairy',
       region: 'indian_south',
-      serving_size_g: 150, // 1 katori
-      serving_unit_name: 'katori',
+      serving_size_g: 150, // 1 bowl
+      serving_unit_name: 'bowl',
       calories: 98,
       protein_g: 5.2,
       carbs_g: 6.8,
@@ -60,14 +144,14 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
       data_source: 'OFF_VERIFIED',
     },
 
-    // North & All-India staples
+    // North & Pan-Indian Staples
     {
       id: 'food-roti-phulka',
-      name: 'Roti / Phulka (Whole Wheat, No Ghee)',
+      name: 'Roti / Chapati (Whole Wheat Flatbread)',
       brand: 'Home / Traditional',
       region: 'indian_north',
-      serving_size_g: 35, // 1 medium roti (cooked)
-      serving_unit_name: 'roti',
+      serving_size_g: 35, // 1 medium piece
+      serving_unit_name: 'piece',
       calories: 88,
       protein_g: 3.1,
       carbs_g: 18.2,
@@ -77,11 +161,11 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
     },
     {
       id: 'food-cooked-white-rice',
-      name: 'Cooked White Rice (Basmati / Sona Masoori)',
+      name: 'Cooked White Rice (Basmati / Sona Masoori / Matta)',
       brand: 'General',
       region: 'global',
-      serving_size_g: 150, // 1 medium katori
-      serving_unit_name: 'katori',
+      serving_size_g: 150, // 1 bowl
+      serving_unit_name: 'bowl',
       calories: 195,
       protein_g: 4.0,
       carbs_g: 43.0,
@@ -91,11 +175,11 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
     },
     {
       id: 'food-yellow-dal-tadka',
-      name: 'Yellow Dal Tadka (Toor / Moong Dal)',
+      name: 'Yellow Dal Tadka (Toor / Moong Lentil Soup)',
       brand: 'Home / Traditional',
       region: 'indian_north',
-      serving_size_g: 150, // 1 katori
-      serving_unit_name: 'katori',
+      serving_size_g: 150, // 1 bowl
+      serving_unit_name: 'bowl',
       calories: 140,
       protein_g: 7.2,
       carbs_g: 18.5,
@@ -105,10 +189,10 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
     },
     {
       id: 'food-paneer-raw',
-      name: 'Raw Paneer (Indian Cottage Cheese)',
+      name: 'Fresh Paneer (Indian Cottage Cheese)',
       brand: 'Dairy Fresh',
       region: 'indian_north',
-      serving_size_g: 100,
+      serving_size_g: 100, // 100g serving or 1 medium slice
       serving_unit_name: 'g',
       calories: 275,
       protein_g: 18.5,
@@ -118,24 +202,38 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
       data_source: 'OFF_VERIFIED',
     },
     {
-      id: 'food-soya-chunks',
-      name: 'Soya Chunks (Defatted Soy Flour, Dry)',
-      brand: 'Nutrela / Generic',
-      region: 'global',
-      serving_size_g: 50, // 1 standard dry serving
-      serving_unit_name: 'g',
-      calories: 172,
-      protein_g: 26.0,
-      carbs_g: 16.5,
-      fat_g: 0.5,
-      fiber_g: 6.5,
-      data_source: 'OFF_VERIFIED',
+      id: 'food-mixed-vegetables-sabzi',
+      name: 'Mixed Vegetable Sabzi / Thoran (Stir-Fried with Coconut)',
+      brand: 'Home / Traditional',
+      region: 'indian_south',
+      serving_size_g: 120, // 1 bowl
+      serving_unit_name: 'bowl',
+      calories: 95,
+      protein_g: 2.5,
+      carbs_g: 10.5,
+      fat_g: 4.8,
+      fiber_g: 3.8,
+      data_source: 'COMMUNITY_RECIPE',
+    },
+    {
+      id: 'food-chicken-curry-home',
+      name: 'Home-Style Chicken Curry (Onion Tomato Gravy)',
+      brand: 'Home / Traditional',
+      region: 'indian_south',
+      serving_size_g: 180, // 1 bowl with 2 chicken pieces
+      serving_unit_name: 'bowl',
+      calories: 230,
+      protein_g: 24.0,
+      carbs_g: 5.5,
+      fat_g: 12.0,
+      fiber_g: 1.5,
+      data_source: 'COMMUNITY_RECIPE',
     },
 
-    // High Protein / Core Staples
+    // High-Protein & Everyday Essentials
     {
       id: 'food-egg-boiled',
-      name: 'Whole Boiled Egg (Large)',
+      name: 'Whole Boiled Egg',
       brand: 'Fresh Farm',
       region: 'global',
       serving_size_g: 50, // 1 egg
@@ -149,7 +247,7 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
     },
     {
       id: 'food-egg-white',
-      name: 'Boiled Egg White (Large)',
+      name: 'Boiled Egg White',
       brand: 'Fresh Farm',
       region: 'global',
       serving_size_g: 33, // 1 white
@@ -163,30 +261,16 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
     },
     {
       id: 'food-chicken-breast-raw',
-      name: 'Boneless Skinless Chicken Breast (Raw)',
+      name: 'Boneless Skinless Chicken Breast (Cooked / Grilled)',
       brand: 'Fresh Butcher',
       region: 'global',
       serving_size_g: 100,
       serving_unit_name: 'g',
-      calories: 120,
-      protein_g: 26.0,
+      calories: 165,
+      protein_g: 31.0,
       carbs_g: 0,
-      fat_g: 1.8,
+      fat_g: 3.6,
       fiber_g: 0,
-      data_source: 'USDA_CC0',
-    },
-    {
-      id: 'food-rolled-oats',
-      name: 'Rolled Oats (Dry)',
-      brand: 'Quaker / Generic',
-      region: 'global',
-      serving_size_g: 40, // 1 serving
-      serving_unit_name: 'g',
-      calories: 152,
-      protein_g: 5.2,
-      carbs_g: 27.0,
-      fat_g: 2.8,
-      fiber_g: 4.0,
       data_source: 'USDA_CC0',
     },
     {
@@ -194,8 +278,8 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
       name: 'Whole Cow Milk',
       brand: 'Dairy Fresh',
       region: 'global',
-      serving_size_g: 200, // 1 standard glass / cup
-      serving_unit_name: 'cup',
+      serving_size_g: 200, // 1 standard glass
+      serving_unit_name: 'glass',
       calories: 124,
       protein_g: 6.4,
       carbs_g: 9.6,
@@ -204,24 +288,66 @@ export async function seedFoods(db: SQLiteDatabase): Promise<void> {
       data_source: 'OFF_VERIFIED',
     },
     {
-      id: 'food-almonds',
-      name: 'Raw Almonds (Badam)',
-      brand: 'Natural',
+      id: 'food-soya-chunks',
+      name: 'Soya Chunks (Nutrela / Defatted Soy)',
+      brand: 'Nutrela / Generic',
       region: 'global',
-      serving_size_g: 28, // ~20-22 nuts
-      serving_unit_name: 'g',
-      calories: 164,
-      protein_g: 6.0,
-      carbs_g: 6.1,
-      fat_g: 14.2,
-      fiber_g: 3.5,
+      serving_size_g: 50, // 1 standard bowl cooked
+      serving_unit_name: 'bowl',
+      calories: 172,
+      protein_g: 26.0,
+      carbs_g: 16.5,
+      fat_g: 0.5,
+      fiber_g: 6.5,
+      data_source: 'OFF_VERIFIED',
+    },
+    {
+      id: 'food-banana-medium',
+      name: 'Banana (Robusta / Nendran / Cavendish)',
+      brand: 'Natural Fruit',
+      region: 'global',
+      serving_size_g: 100, // 1 medium piece
+      serving_unit_name: 'piece',
+      calories: 89,
+      protein_g: 1.1,
+      carbs_g: 22.8,
+      fat_g: 0.3,
+      fiber_g: 2.6,
+      data_source: 'USDA_CC0',
+    },
+    {
+      id: 'food-apple-medium',
+      name: 'Apple (Fresh Medium)',
+      brand: 'Natural Fruit',
+      region: 'global',
+      serving_size_g: 150, // 1 medium piece
+      serving_unit_name: 'piece',
+      calories: 78,
+      protein_g: 0.4,
+      carbs_g: 20.6,
+      fat_g: 0.2,
+      fiber_g: 3.6,
+      data_source: 'USDA_CC0',
+    },
+    {
+      id: 'food-pure-ghee',
+      name: 'Pure Desi Ghee (Clarified Butter)',
+      brand: 'Dairy Traditional',
+      region: 'global',
+      serving_size_g: 5, // 1 teaspoon
+      serving_unit_name: 'teaspoon',
+      calories: 45,
+      protein_g: 0,
+      carbs_g: 0,
+      fat_g: 5.0,
+      fiber_g: 0,
       data_source: 'USDA_CC0',
     },
   ];
 
   for (const f of foods) {
     await db.runAsync(
-      `INSERT OR IGNORE INTO foods
+      `INSERT OR REPLACE INTO foods
       (id, name, brand, region, serving_size_g, serving_unit_name, calories, protein_g, carbs_g, fat_g, fiber_g, data_source, is_verified, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);`,
       [

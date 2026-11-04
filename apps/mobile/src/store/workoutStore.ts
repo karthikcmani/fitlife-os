@@ -60,6 +60,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         equipmentRequired: r.equipment_required,
         isCustom: Boolean(r.is_custom),
         createdAt: r.created_at,
+        simpleExplanation: r.simple_explanation || undefined,
+        beginnerInstructions: r.beginner_instructions || undefined,
+        commonMistakes: r.common_mistakes ? JSON.parse(r.common_mistakes) : [],
+        easierAlternatives: r.easier_alternatives ? JSON.parse(r.easier_alternatives) : [],
+        recommendedSets: r.recommended_sets ?? 3,
+        recommendedReps: r.recommended_reps ?? '8-12 reps',
+        recommendedRestSec: r.recommended_rest_sec ?? 60,
       })),
       isLoading: false,
     });
