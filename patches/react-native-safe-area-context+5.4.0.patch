@@ -1,0 +1,15 @@
+diff --git a/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt b/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt
+index e99f8d5..c6d37fa 100644
+--- a/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt
++++ b/node_modules/react-native-safe-area-context/android/src/main/java/com/th3rdwave/safeareacontext/SafeAreaView.kt
+@@ -58,3 +58,9 @@ class SafeAreaView(context: Context) : ReactViewGroup(context) {
+           reactContext.runOnNativeModulesQueueThread {
+-            uiManager.uiImplementation.dispatchViewUpdates(-1)
++            try {
++              val method = uiManager.javaClass.getMethod("getUIImplementation")
++              val impl = method.invoke(uiManager)
++              impl?.javaClass?.getMethod("dispatchViewUpdates", Int::class.javaPrimitiveType)?.invoke(impl, -1)
++            } catch (e: Exception) {
++              // Ignored on React Native 0.88+ New Architecture
++            }
+           }
