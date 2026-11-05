@@ -63,11 +63,15 @@ export interface BodyMeasurements {
 
 export type UnitSystem = 'metric' | 'imperial';
 
+export type ExperienceMode = 'beginner' | 'advanced';
+
 export interface PlanExerciseItem {
   exerciseId: string;
   name: string;
   category?: string;
   whyIncluded: string;
+  whatThisImproves?: string;
+  whatYouShouldFeel?: string;
   targetedMusclesSimple: string;
   equipmentRequired: string;
   startingPosition: string;
@@ -133,6 +137,9 @@ export interface UserProfile {
   dietaryPreference?: DietaryPreference;
   injuriesOrLimitations?: PhysicalLimitation[];
   bodyMeasurements?: BodyMeasurements;
+  experienceMode?: ExperienceMode;
+  themeAppearance?: 'system' | 'light' | 'dark';
+  themeColor?: 'emerald' | 'ocean' | 'violet' | 'neutral';
   preferredUnitSystem: UnitSystem;
   dailyWaterTargetMl: number;
   createdAt: string;

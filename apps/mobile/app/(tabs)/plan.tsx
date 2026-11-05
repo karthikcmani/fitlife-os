@@ -57,6 +57,7 @@ export default function MyPlanScreen() {
   // Set Logging Inputs
   const [inputWeight, setInputWeight] = useState('0');
   const [inputReps, setInputReps] = useState('10');
+  const [inputRpe, setInputRpe] = useState('8');
 
   // Alternative Swap Modal/State
   const [customExerciseOverride, setCustomExerciseOverride] = useState<Record<number, PlanExerciseItem>>({});
@@ -121,8 +122,9 @@ export default function MyPlanScreen() {
     if (!currentExercise) return;
     const w = parseFloat(inputWeight) || 0;
     const r = parseInt(inputReps, 10) || 10;
+    const rpe = profile?.experienceMode === 'advanced' ? parseFloat(inputRpe) || 8 : 8;
 
-    await addSetToActive(currentExercise.exerciseId, w, r);
+    await addSetToActive(currentExercise.exerciseId, w, r, rpe);
 
     // Trigger rest timer
     const restSec = currentExercise.recommendedRestSec || 60;
@@ -331,6 +333,12 @@ export default function MyPlanScreen() {
                   onPress={handleStartSession}
                   style={styles.startRoutineBtn}
                 />
+                <Button
+                  title="Automated Push-Up Rep Counter 📱"
+                  variant="outline"
+                  onPress={() => router.push('/pushup-tracker')}
+                  style={{ marginTop: 8 }}
+                />
               </SurfaceCard>
             ) : (
               /* ACTIVE WORKOUT COACHING STEPPER */
@@ -368,6 +376,8 @@ export default function MyPlanScreen() {
                       exerciseId={currentExercise.exerciseId}
                       category={currentExercise.category ?? 'bodyweight'}
                       exerciseName={currentExercise.name}
+                      whatYouShouldFeel={currentExercise.whatYouShouldFeel}
+                      whatThisImproves={currentExercise.whatThisImproves}
                     />
 
                     <Text style={styles.currentExerciseTitle}>{currentExercise.name}</Text>

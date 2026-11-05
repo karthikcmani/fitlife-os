@@ -246,9 +246,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
     const db = await getLocalDatabase();
     await db.runAsync(
-      `INSERT INTO workout_sets (id, workout_session_id, exercise_id, set_index, set_type, weight_kg, reps, rpe, is_completed, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?);`,
-      [newSet.id, newSet.workoutSessionId, newSet.exerciseId, newSet.setIndex, newSet.setType, newSet.weightKg, newSet.reps, newSet.rpe ?? null, now]
+      `INSERT INTO workout_sets (id, workout_session_id, exercise_id, set_index, set_type, weight_kg, reps, rpe, is_completed, created_at, client_created_at, is_deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0);`,
+      [newSet.id, newSet.workoutSessionId, newSet.exerciseId, newSet.setIndex, newSet.setType, newSet.weightKg, newSet.reps, newSet.rpe ?? null, now, now]
     );
 
     // Enqueue sync mutation
@@ -317,8 +317,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         [now, active.id]
       );
       await db.runAsync(
-        `DELETE FROM workout_sets WHERE workout_session_id = ?;`,
-        [active.id]
+        `UPDATE workout_sets SET is_deleted = 1, client_updated_at = ? WHERE workout_session_id = ?;`,
+        [now, active.id]
       );
       await SyncManager.enqueueMutation('workout_sessions', active.id, 'DELETE', {
         id: active.id,

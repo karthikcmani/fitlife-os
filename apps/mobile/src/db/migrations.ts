@@ -74,6 +74,9 @@ export async function runLocalMigrations(db: SQLiteDatabase): Promise<void> {
         rpe REAL,
         is_completed INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
+        client_created_at TEXT,
+        client_updated_at TEXT,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (workout_session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises(id)
       );
@@ -167,16 +170,25 @@ export async function runLocalMigrations(db: SQLiteDatabase): Promise<void> {
       CREATE TABLE IF NOT EXISTS body_measurements (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
-        measured_date TEXT NOT NULL UNIQUE,
+        measured_date TEXT,
+        date TEXT,
+        measured_at TEXT,
         weight_kg REAL NOT NULL,
         waist_cm REAL,
         chest_cm REAL,
         arms_cm REAL,
+        biceps_cm REAL,
         thighs_cm REAL,
         hips_cm REAL,
         neck_cm REAL,
+        body_fat_pct REAL,
+        encrypted_photo_uri TEXT,
+        photo_iv TEXT,
         notes TEXT,
-        created_at TEXT NOT NULL
+        client_created_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        is_deleted INTEGER NOT NULL DEFAULT 0
       );
 
       -- 6. Offline Sync Management Queue
@@ -312,5 +324,195 @@ export async function runLocalMigrations(db: SQLiteDatabase): Promise<void> {
       `INSERT INTO _local_migrations (version, applied_at) VALUES (4, ?);`,
       [Date.now()]
     );
+  }
+
+  // --- MIGRATION 5: Schema Stability, Workout Sets is_deleted, Activity & Sleep Integrations ---
+  const applied5 = await db.getAllAsync<{ version: number }>(
+    `SELECT version FROM _local_migrations WHERE version = 5`
+  );
+
+  if (applied5.length === 0) {
+    await db.withTransactionAsync(async () => {
+      const getCols = async (table: string): Promise<Set<string>> => {
+        try {
+          const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table});`);
+          return new Set(rows.map((r) => r.name));
+        } catch {
+          return new Set();
+        }
+      };
+
+      // 1. Upgrade workout_sets
+      const wsCols = await getCols('workout_sets');
+      if (!wsCols.has('is_deleted')) {
+        await db.execAsync(`ALTER TABLE workout_sets ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;`);
+      }
+      if (!wsCols.has('client_created_at')) {
+        await db.execAsync(`ALTER TABLE workout_sets ADD COLUMN client_created_at TEXT;`);
+      }
+      if (!wsCols.has('client_updated_at')) {
+        await db.execAsync(`ALTER TABLE workout_sets ADD COLUMN client_updated_at TEXT;`);
+      }
+
+      // 2. Upgrade workout_sessions
+      const wssCols = await getCols('workout_sessions');
+      if (!wssCols.has('is_deleted')) {
+        await db.execAsync(`ALTER TABLE workout_sessions ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;`);
+      }
+
+      // 3. Upgrade body_measurements
+      const bmCols = await getCols('body_measurements');
+      if (!bmCols.has('date')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN date TEXT;`);
+      }
+      if (!bmCols.has('measured_at')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN measured_at TEXT;`);
+      }
+      if (!bmCols.has('encrypted_photo_uri')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN encrypted_photo_uri TEXT;`);
+      }
+      if (!bmCols.has('photo_iv')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN photo_iv TEXT;`);
+      }
+      if (!bmCols.has('body_fat_pct')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN body_fat_pct REAL;`);
+      }
+      if (!bmCols.has('biceps_cm')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN biceps_cm REAL;`);
+      }
+      if (!bmCols.has('client_created_at')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN client_created_at TEXT;`);
+      }
+      if (!bmCols.has('updated_at')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN updated_at TEXT;`);
+      }
+      if (!bmCols.has('is_deleted')) {
+        await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;`);
+      }
+
+      // Backfill date / measured_at from measured_date if null
+      await db.execAsync(`
+        UPDATE body_measurements SET date = measured_date WHERE date IS NULL AND measured_date IS NOT NULL;
+        UPDATE body_measurements SET measured_at = date || 'T00:00:00.000Z' WHERE measured_at IS NULL AND date IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_body_meas_user_date ON body_measurements(user_id, date);
+      `);
+
+      // 4. Upgrade user_profiles
+      const upCols = await getCols('user_profiles');
+      if (!upCols.has('experience_mode')) {
+        await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN experience_mode TEXT NOT NULL DEFAULT 'beginner';`);
+      }
+      if (!upCols.has('theme_appearance')) {
+        await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN theme_appearance TEXT NOT NULL DEFAULT 'system';`);
+      }
+      if (!upCols.has('theme_color')) {
+        await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'emerald';`);
+      }
+      if (!upCols.has('unavailable_equipment')) {
+        await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN unavailable_equipment TEXT NOT NULL DEFAULT '[]';`);
+      }
+
+      // 5. Upgrade sleep_logs
+      const slCols = await getCols('sleep_logs');
+      if (!slCols.has('source')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN source TEXT NOT NULL DEFAULT 'fitlife_manual';`);
+      }
+      if (!slCols.has('sleep_stages')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN sleep_stages TEXT;`);
+      }
+      if (!slCols.has('deep_sleep_minutes')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN deep_sleep_minutes INTEGER;`);
+      }
+      if (!slCols.has('rem_sleep_minutes')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN rem_sleep_minutes INTEGER;`);
+      }
+      if (!slCols.has('light_sleep_minutes')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN light_sleep_minutes INTEGER;`);
+      }
+      if (!slCols.has('awake_minutes')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN awake_minutes INTEGER;`);
+      }
+      if (!slCols.has('external_id')) {
+        await db.execAsync(`ALTER TABLE sleep_logs ADD COLUMN external_id TEXT;`);
+      }
+
+      // 6. Create activity_sessions & daily_activity_summaries
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS activity_sessions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          activity_type TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          ended_at TEXT,
+          duration_seconds INTEGER NOT NULL DEFAULT 0,
+          step_count INTEGER NOT NULL DEFAULT 0,
+          distance_meters REAL NOT NULL DEFAULT 0,
+          calories_burned REAL NOT NULL DEFAULT 0,
+          average_pace_sec_km REAL,
+          route_geojson TEXT,
+          source TEXT NOT NULL DEFAULT 'fitlife_sensor',
+          is_deleted INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS daily_activity_summaries (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          date TEXT NOT NULL UNIQUE,
+          step_count INTEGER NOT NULL DEFAULT 0,
+          active_minutes INTEGER NOT NULL DEFAULT 0,
+          distance_meters REAL NOT NULL DEFAULT 0,
+          calories_burned REAL NOT NULL DEFAULT 0,
+          source TEXT NOT NULL DEFAULT 'fitlife_sensor',
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS health_connect_sync_logs (
+          id TEXT PRIMARY KEY,
+          record_type TEXT NOT NULL,
+          external_id TEXT NOT NULL UNIQUE,
+          data_payload TEXT,
+          synced_at TEXT NOT NULL
+        );
+      `);
+
+      await db.runAsync(
+        `INSERT INTO _local_migrations (version, applied_at) VALUES (5, ?);`,
+        [Date.now()]
+      );
+    });
+  }
+
+  // Final defensive check: ensures is_deleted on workout_sets and other critical columns exist regardless of history
+  await ensureSchemaConsistency(db);
+}
+
+/**
+ * Defensive schema consistency check that runs on every startup.
+ * Guarantees required columns exist even if an interrupted migration occurred.
+ */
+async function ensureSchemaConsistency(db: SQLiteDatabase): Promise<void> {
+  try {
+    const wsCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(workout_sets);`);
+    const setCols = new Set(wsCols.map((c) => c.name));
+    if (!setCols.has('is_deleted')) {
+      await db.execAsync(`ALTER TABLE workout_sets ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;`);
+    }
+  } catch {
+    // workout_sets might not exist yet before first migration
+  }
+
+  try {
+    const bmCols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(body_measurements);`);
+    const setCols = new Set(bmCols.map((c) => c.name));
+    if (!setCols.has('date')) {
+      await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN date TEXT;`);
+    }
+    if (!setCols.has('is_deleted')) {
+      await db.execAsync(`ALTER TABLE body_measurements ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;`);
+    }
+  } catch {
+    // body_measurements might not exist yet
   }
 }

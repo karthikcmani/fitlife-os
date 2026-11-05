@@ -26,6 +26,8 @@ export interface CoachExerciseDefinition {
   requiredEquipment: EquipmentItem[];
   targetedMusclesSimple: string;
   whyIncluded: string;
+  whatThisImproves?: string;
+  whatYouShouldFeel?: string;
   startingPosition: string;
   instructions: string[];
   recommendedSets: number;
@@ -850,6 +852,10 @@ function buildWeeklyWorkouts(
       name: ex.name,
       category: ex.category,
       whyIncluded: ex.whyIncluded,
+      whatThisImproves: ex.whatThisImproves || ex.whyIncluded,
+      whatYouShouldFeel:
+        ex.whatYouShouldFeel ||
+        'Keep your back straight. Tighten your stomach gently as if preparing for someone to poke it. You should feel your working muscles contract with zero joint discomfort.',
       targetedMusclesSimple: ex.targetedMusclesSimple,
       equipmentRequired: ex.requiredEquipment.includes('none') ? 'None (Bodyweight)' : ex.requiredEquipment.join(', '),
       startingPosition: ex.startingPosition,

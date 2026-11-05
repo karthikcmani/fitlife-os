@@ -19,7 +19,8 @@ import { useWorkoutStore } from '../../src/store/workoutStore';
 import { TrainingEnvironment, EquipmentItem, UserProfile } from '../../src/types';
 import { SyncManager } from '../../src/services/syncManager';
 import { localNotificationManager, LocalNotificationSchedule } from '../../src/services/localNotifications';
-import { theme } from '../../src/theme';
+import { theme, useTheme, useThemeStore, ThemeAppearance, ThemeColor } from '../../src/theme';
+import { healthConnectService } from '../../src/services/healthConnect';
 import {
   calculateBmrMifflinStJeor,
   calculateTdee,
@@ -29,12 +30,18 @@ import {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const themeStore = useThemeStore();
   const { profile, setProfile, isAuthenticated, backendUrl, logout, setBackendUrl } = useAuthStore();
   const { saveAndActivatePlan } = useCoachStore();
   const { activeSession } = useWorkoutStore();
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [serverUrlInput, setServerUrlInput] = useState(backendUrl);
+
+  // Health Connect status
+  const [healthStatus, setHealthStatus] = useState<any>(null);
+  const [isSyncingHC, setIsSyncingHC] = useState(false);
 
   // Profile Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -57,7 +64,34 @@ export default function ProfileScreen() {
   useEffect(() => {
     SyncManager.getPendingCount().then(setPendingSyncCount);
     setSchedules([...localNotificationManager.getSchedules()]);
+    healthConnectService.getStatus().then(setHealthStatus);
   }, []);
+
+  const handleExperienceModeChange = async (mode: 'beginner' | 'advanced') => {
+    if (!profile) return;
+    const updated = { ...profile, experienceMode: mode };
+    await setProfile(updated);
+  };
+
+  const handleImportHealthConnect = async () => {
+    if (!profile) return;
+    setIsSyncingHC(true);
+    try {
+      await healthConnectService.requestPermissions();
+      const sleepRes = await healthConnectService.importSleepRecords(profile.userId);
+      const actRes = await healthConnectService.importActivityRecords(profile.userId);
+      Alert.alert(
+        'Health Connect Synced',
+        `Imported: ${actRes.importedCount} activity record(s), ${sleepRes.importedCount} sleep log(s).\nSkipped duplicates: ${actRes.skippedDuplicates + sleepRes.skippedDuplicates}.`
+      );
+      const st = await healthConnectService.getStatus();
+      setHealthStatus(st);
+    } catch (err: any) {
+      Alert.alert('Import Failed', err?.message || 'Unable to import from Health Connect.');
+    } finally {
+      setIsSyncingHC(false);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -506,6 +540,150 @@ export default function ProfileScreen() {
         )}
       </SurfaceCard>
 
+      {/* Experience Coaching Level */}
+      <SurfaceCard>
+        <Text style={styles.sectionHeading}>Coaching Experience Mode</Text>
+        <Text style={styles.bodyText}>
+          Choose how the coaching plan presents exercises, weights, and effort cues.
+        </Text>
+
+        <View style={styles.modeToggleRow}>
+          <TouchableOpacity
+            style={[
+              styles.modeCard,
+              (profile?.experienceMode ?? 'beginner') === 'beginner' && {
+                borderColor: colors.primary,
+                backgroundColor: isDark ? 'rgba(0, 230, 153, 0.12)' : 'rgba(0, 204, 136, 0.12)',
+              },
+            ]}
+            onPress={() => handleExperienceModeChange('beginner')}
+          >
+            <Text style={styles.modeTitle}>🌱 Beginner Mode</Text>
+            <Text style={styles.modeDesc}>
+              Clear form cues, plain language, simple set tracking. No confusing jargon.
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeCard,
+              profile?.experienceMode === 'advanced' && {
+                borderColor: colors.primary,
+                backgroundColor: isDark ? 'rgba(0, 230, 153, 0.12)' : 'rgba(0, 204, 136, 0.12)',
+              },
+            ]}
+            onPress={() => handleExperienceModeChange('advanced')}
+          >
+            <Text style={styles.modeTitle}>⚡ Advanced Mode</Text>
+            <Text style={styles.modeDesc}>
+              RPE effort rating (1-10), tonnage volume load in kg, estimated 1RM, and progressive overload.
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SurfaceCard>
+
+      {/* Appearance & Themes */}
+      <SurfaceCard>
+        <Text style={styles.sectionHeading}>Appearance & Theme</Text>
+        <Text style={styles.bodyText}>
+          Select light or dark mode and your favorite accent theme. Pure contrast and zero distraction.
+        </Text>
+
+        <Text style={styles.themeSubLabel}>Appearance Mode</Text>
+        <View style={styles.themeRow}>
+          {(['dark', 'light', 'system'] as ThemeAppearance[]).map((appMode) => (
+            <TouchableOpacity
+              key={appMode}
+              style={[
+                styles.themeBtn,
+                themeStore.appearance === appMode && {
+                  borderColor: colors.primary,
+                  backgroundColor: colors.primary,
+                },
+              ]}
+              onPress={() => themeStore.setAppearance(appMode)}
+            >
+              <Text
+                style={[
+                  styles.themeBtnText,
+                  themeStore.appearance === appMode && { color: colors.textInverse },
+                ]}
+              >
+                {appMode === 'dark' ? '🌙 Dark' : appMode === 'light' ? '☀️ Light' : '⚙️ System'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={[styles.themeSubLabel, { marginTop: 12 }]}>Color Palette</Text>
+        <View style={styles.themeRow}>
+          {(
+            [
+              { id: 'emerald', label: 'Emerald 🟢' },
+              { id: 'ocean', label: 'Ocean 🔵' },
+              { id: 'violet', label: 'Violet 🟣' },
+              { id: 'neutral', label: 'Neutral ⚪' },
+            ] as { id: ThemeColor; label: string }[]
+          ).map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={[
+                styles.paletteChip,
+                themeStore.themeColor === c.id && {
+                  borderColor: colors.primary,
+                  backgroundColor: colors.primary,
+                },
+              ]}
+              onPress={() => themeStore.setThemeColor(c.id)}
+            >
+              <Text
+                style={[
+                  styles.paletteChipText,
+                  themeStore.themeColor === c.id && { color: colors.textInverse },
+                ]}
+              >
+                {c.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </SurfaceCard>
+
+      {/* Smart Motion Tools & Health Connect */}
+      <SurfaceCard>
+        <Text style={styles.sectionHeading}>Smart Motion & Health Connect</Text>
+        <Text style={styles.bodyText}>
+          100% FLOSS, local-first sensors. Automatic push-up repetition counter and Health Connect sync with deduplication.
+        </Text>
+
+        <Button
+          title="Open Automated Push-Up Tracker 📷"
+          variant="outline"
+          onPress={() => router.push('/pushup-tracker')}
+          style={{ marginBottom: 12 }}
+        />
+
+        <View style={styles.healthConnectBox}>
+          <Text style={styles.healthConnectTitle}>Android Health Connect</Text>
+          <Text style={styles.healthConnectSub}>
+            Status: {healthStatus?.isConnected ? '🟢 Connected' : '⚪ Ready to Connect'}
+          </Text>
+          {healthStatus?.lastSyncTimestamp && (
+            <Text style={styles.healthConnectSub}>
+              Last synced: {new Date(healthStatus.lastSyncTimestamp).toLocaleString()}
+            </Text>
+          )}
+
+          <Button
+            title={isSyncingHC ? 'Syncing...' : 'Import Steps & Sleep Data'}
+            variant="secondary"
+            loading={isSyncingHC}
+            onPress={handleImportHealthConnect}
+            style={{ marginTop: 8 }}
+          />
+        </View>
+      </SurfaceCard>
+
       {/* 2. Local Notifications & Reminders (100% FLOSS, 0 Firebase) */}
       <SurfaceCard>
         <Text style={styles.sectionHeading}>Local Notification Reminders</Text>
@@ -855,5 +1033,82 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: theme.spacing.xs,
+  },
+  modeToggleRow: {
+    flexDirection: 'column',
+    gap: 10,
+    marginTop: theme.spacing.sm,
+  },
+  modeCard: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+  },
+  modeTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  modeDesc: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  themeSubLabel: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textMuted,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  themeBtn: {
+    flex: 1,
+    minWidth: 80,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  themeBtnText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+  },
+  paletteChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  paletteChipText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+    fontSize: 12,
+  },
+  healthConnectBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  healthConnectTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+    marginBottom: 2,
+  },
+  healthConnectSub: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: 4,
   },
 });

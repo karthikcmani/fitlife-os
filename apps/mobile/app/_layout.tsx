@@ -2,15 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { getLocalDatabase } from '../src/db/sqlite';
 import { runLocalMigrations } from '../src/db/migrations';
 import { useAuthStore } from '../src/store/authStore';
-import { theme } from '../src/theme';
+import { theme, useThemeStore, useTheme } from '../src/theme';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const { initialize, isOnboarded } = useAuthStore();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
@@ -18,6 +20,7 @@ export default function RootLayout() {
       try {
         const db = await getLocalDatabase();
         await runLocalMigrations(db);
+        await useThemeStore.getState().initialize();
         await initialize();
         setIsReady(true);
       } catch (err: any) {
@@ -53,12 +56,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: theme.colors.background },
-          headerTintColor: theme.colors.textPrimary,
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.textPrimary,
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: theme.colors.background },
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -66,6 +70,7 @@ export default function RootLayout() {
         <Stack.Screen name="photo-vault" options={{ headerShown: false }} />
         <Stack.Screen name="community" options={{ headerShown: false }} />
         <Stack.Screen name="workout-completed" options={{ headerShown: false }} />
+        <Stack.Screen name="pushup-tracker" options={{ headerShown: false }} />
         <Stack.Screen
           name="auth"
           options={{ presentation: 'modal', title: 'Account & Synchronization' }}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../theme';
+import { theme, useTheme } from '../../theme';
 
 interface HeaderProps {
   title: string;
@@ -13,11 +13,13 @@ export const Header: React.FC<HeaderProps> = ({
   subtitle,
   rightAction,
 }) => {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.container}>
       <View style={styles.textContainer}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+        {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
       </View>
       {rightAction ? <View style={styles.actionContainer}>{rightAction}</View> : null}
     </View>

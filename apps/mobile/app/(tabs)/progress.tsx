@@ -52,7 +52,7 @@ export default function ProgressScreen() {
     try {
       const db = await getLocalDatabase();
       const rows = await db.getAllAsync<{ date: string; weight_kg: number }>(
-        'SELECT date, weight_kg FROM body_measurements WHERE user_id = ? AND weight_kg IS NOT NULL ORDER BY date DESC LIMIT 10',
+        'SELECT COALESCE(date, measured_date) as date, weight_kg FROM body_measurements WHERE user_id = ? AND weight_kg IS NOT NULL AND (is_deleted IS NULL OR is_deleted = 0) ORDER BY COALESCE(date, measured_date) DESC LIMIT 10',
         [userId]
       );
       if (rows && rows.length > 0) {
@@ -94,11 +94,12 @@ export default function ProgressScreen() {
     try {
       const db = await getLocalDatabase();
       const id = `bm_${Date.now()}`;
+      const now = new Date().toISOString();
       await db.runAsync(
-        `INSERT INTO body_measurements (id, user_id, date, weight_kg, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO body_measurements (id, user_id, date, measured_date, measured_at, weight_kg, created_at, updated_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
          ON CONFLICT(user_id, date) DO UPDATE SET weight_kg = excluded.weight_kg, updated_at = excluded.updated_at`,
-        [id, userId, dateStr, val, new Date().toISOString(), new Date().toISOString()]
+        [id, userId, dateStr, dateStr, now, val, now, now]
       );
 
       if (profile) {

@@ -36,6 +36,14 @@ This document logs architectural trade-offs, discovered technical risks, upstrea
   };
   ```
 
+### 1.4 SQLite Schema Inconsistency on Legacy Upgrades (`no such column: is_deleted`)
+- **Issue:** Early development versions initialized `workout_sets` without `is_deleted`. When newer queries checked `WHERE workout_session_id = ? AND is_deleted = 0`, SQLite aborted with `Error code 1: no such column: is_deleted`, blocking workout completion.
+- **Resolution:** Added Migration 5 with dynamic PRAGMA introspection, forward-compatible `ALTER TABLE ADD COLUMN` statements, and startup schema verification (`ensureSchemaConsistency`) that guarantees table integrity without data loss.
+
+### 1.5 Corrupted Tab Bar Glyph Rectangles ("NO GLYPH") on Standalone Android Builds
+- **Issue:** Standalone release APKs running on devices like the Nothing Phone (3a) failed to render font-based icon glyphs (MaterialIcons/Ionicons), displaying `.notdef` box characters.
+- **Resolution:** Removed icon font dependencies from navigation headers and tab bars. Implemented pure React Native View-based vector icons (`TabIcons.tsx`) with zero external font dependencies.
+
 ---
 
 ## 2. Product Decisions (Approved Status)

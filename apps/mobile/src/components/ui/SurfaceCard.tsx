@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '../../theme';
+import { theme, useTheme } from '../../theme';
 
 interface SurfaceCardProps {
   children: React.ReactNode;
@@ -13,10 +13,16 @@ export const SurfaceCard: React.FC<SurfaceCardProps> = ({
   style,
   elevated = false,
 }) => {
+  const { colors } = useTheme();
+
   return (
     <View
       style={[
         styles.card,
+        {
+          backgroundColor: elevated ? colors.surfaceElevated : colors.surface,
+          borderColor: elevated ? colors.borderLight : colors.border,
+        },
         elevated && styles.elevated,
         style,
       ]}

@@ -8,7 +8,7 @@ import {
   TextStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { theme } from '../../theme';
+import { theme, useTheme } from '../../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger';
 
@@ -31,6 +31,8 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { colors } = useTheme();
+
   const handlePress = async () => {
     if (disabled || loading) return;
     try {
@@ -41,33 +43,41 @@ export const Button: React.FC<ButtonProps> = ({
     onPress();
   };
 
-  const getContainerStyle = () => {
-    if (disabled) return styles.disabledContainer;
+  const getContainerStyle = (): ViewStyle => {
+    if (disabled) return { backgroundColor: colors.buttonDisabled };
     switch (variant) {
       case 'secondary':
-        return styles.secondaryContainer;
+        return {
+          backgroundColor: colors.surfaceElevated,
+          borderWidth: 1,
+          borderColor: colors.border,
+        };
       case 'outline':
-        return styles.outlineContainer;
+        return {
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderColor: colors.primary,
+        };
       case 'danger':
-        return styles.dangerContainer;
+        return { backgroundColor: colors.danger };
       case 'primary':
       default:
-        return styles.primaryContainer;
+        return { backgroundColor: colors.primary };
     }
   };
 
-  const getTextStyle = () => {
-    if (disabled) return styles.disabledText;
+  const getTextStyle = (): TextStyle => {
+    if (disabled) return { color: colors.buttonDisabledText };
     switch (variant) {
       case 'secondary':
-        return styles.secondaryText;
+        return { color: colors.textPrimary };
       case 'outline':
-        return styles.outlineText;
+        return { color: colors.primary };
       case 'danger':
-        return styles.dangerText;
+        return { color: '#FFFFFF' };
       case 'primary':
       default:
-        return styles.primaryText;
+        return { color: colors.textInverse };
     }
   };
 
@@ -79,7 +89,7 @@ export const Button: React.FC<ButtonProps> = ({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? theme.colors.textInverse : theme.colors.primary} />
+        <ActivityIndicator color={variant === 'primary' ? colors.textInverse : colors.primary} />
       ) : (
         <Text style={[styles.baseText, getTextStyle(), textStyle]}>{title}</Text>
       )}

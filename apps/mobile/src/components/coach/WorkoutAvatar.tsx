@@ -7,25 +7,32 @@ import {
   TouchableOpacity,
   Easing,
 } from 'react-native';
-import { theme } from '../../theme';
+import { theme, useTheme } from '../../theme';
 
 interface WorkoutAvatarProps {
   exerciseId: string;
   category: string;
   exerciseName: string;
+  whatYouShouldFeel?: string;
+  whatThisImproves?: string;
 }
 
 /**
  * Animated Workout Avatar Coach.
  * Dynamically demonstrates exercise movements with continuous 60fps
- * biomechanical animations and live tempo cues (Descent / Drive / Breathing).
+ * biomechanical animations, Front/Side views, posture alignment guides,
+ * and live tempo cues (Descent / Drive / Breathing).
  */
 export function WorkoutAvatar({
   exerciseId,
   category,
   exerciseName,
+  whatYouShouldFeel,
+  whatThisImproves,
 }: WorkoutAvatarProps) {
+  const { colors, isDark } = useTheme();
   const [isPlaying, setIsPlaying] = useState(true);
+  const [viewMode, setViewMode] = useState<'side' | 'front'>('side');
   const [movementPhase, setMovementPhase] = useState<'eccentric' | 'pause' | 'concentric'>('eccentric');
 
   // Animation drivers
@@ -191,19 +198,36 @@ export function WorkoutAvatar({
       {/* Header bar with Action indicator and Play/Pause */}
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>
-          <View style={[styles.statusDot, { backgroundColor: isPlaying ? theme.colors.primary : theme.colors.textMuted }]} />
-          <Text style={styles.badgeText}>
+          <View style={[styles.statusDot, { backgroundColor: isPlaying ? colors.primary : colors.textMuted }]} />
+          <Text style={[styles.badgeText, { color: colors.textMuted }]}>
             {isPlaying ? 'ACTIVE FORM DEMO' : 'PAUSED'}
           </Text>
         </View>
 
-        <TouchableOpacity
-          onPress={() => setIsPlaying(!isPlaying)}
-          style={styles.toggleBtn}
-          accessibilityLabel={isPlaying ? 'Pause demonstration' : 'Play demonstration'}
-        >
-          <Text style={styles.toggleBtnText}>{isPlaying ? '⏸ Pause' : '▶ Play'}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          <View style={[styles.viewToggleGroup, { borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, viewMode === 'side' && { backgroundColor: colors.primary }]}
+              onPress={() => setViewMode('side')}
+            >
+              <Text style={[styles.viewToggleText, { color: viewMode === 'side' ? colors.textInverse : colors.textMuted }]}>Side</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, viewMode === 'front' && { backgroundColor: colors.primary }]}
+              onPress={() => setViewMode('front')}
+            >
+              <Text style={[styles.viewToggleText, { color: viewMode === 'front' ? colors.textInverse : colors.textMuted }]}>Front</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setIsPlaying(!isPlaying)}
+            style={[styles.toggleBtn, { borderColor: colors.border }]}
+            accessibilityLabel={isPlaying ? 'Pause demonstration' : 'Play demonstration'}
+          >
+            <Text style={[styles.toggleBtnText, { color: colors.textPrimary }]}>{isPlaying ? '⏸' : '▶'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Center Stage: Animated Coach Avatar */}
@@ -318,6 +342,13 @@ export function WorkoutAvatar({
           <Text style={styles.breathText}>{breathCue}</Text>
         </View>
       </View>
+
+      {whatYouShouldFeel && (
+        <View style={[styles.feelBox, { backgroundColor: 'rgba(0, 230, 153, 0.08)', borderColor: colors.primary }]}>
+          <Text style={[styles.feelLabel, { color: colors.primary }]}>💡 WHAT YOU SHOULD FEEL:</Text>
+          <Text style={[styles.feelText, { color: colors.textPrimary }]}>{whatYouShouldFeel}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -336,6 +367,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  viewToggleGroup: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  viewToggleBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  viewToggleText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  feelBox: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+  },
+  feelLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  feelText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   badgeRow: {
     flexDirection: 'row',

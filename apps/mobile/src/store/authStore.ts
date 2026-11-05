@@ -70,6 +70,9 @@ export const useAuthStore = create<AuthState>((set) => ({
               : {},
             preferredUnitSystem: localProfile.preferred_unit_system,
             dailyWaterTargetMl: localProfile.daily_water_target_ml,
+            experienceMode: localProfile.experience_mode ?? 'beginner',
+            themeAppearance: localProfile.theme_appearance ?? 'system',
+            themeColor: localProfile.theme_color ?? 'emerald',
             createdAt: localProfile.created_at,
             updatedAt: localProfile.updated_at,
           },
@@ -99,8 +102,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     const db = await getLocalDatabase();
     await db.runAsync(
       `INSERT OR REPLACE INTO user_profiles
-      (user_id, display_name, date_of_birth, gender, height_cm, current_weight_kg, fitness_level, activity_level, primary_goal, training_environment, available_training_days, session_duration_minutes, equipment_inventory, dietary_preference, injuries_or_limitations, body_measurements, preferred_unit_system, daily_water_target_ml, unavailable_equipment, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      (user_id, display_name, date_of_birth, gender, height_cm, current_weight_kg, fitness_level, activity_level, primary_goal, training_environment, available_training_days, session_duration_minutes, equipment_inventory, dietary_preference, injuries_or_limitations, body_measurements, preferred_unit_system, daily_water_target_ml, unavailable_equipment, experience_mode, theme_appearance, theme_color, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         profile.userId,
         profile.displayName,
@@ -121,6 +124,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         profile.preferredUnitSystem,
         profile.dailyWaterTargetMl,
         JSON.stringify(profile.unavailableEquipment ?? []),
+        profile.experienceMode ?? 'beginner',
+        profile.themeAppearance ?? 'system',
+        profile.themeColor ?? 'emerald',
         profile.createdAt,
         profile.updatedAt,
       ]

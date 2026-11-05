@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../../theme';
+import { theme, useTheme } from '../../theme';
 
 interface ScreenContainerProps {
   children: React.ReactNode;
@@ -27,14 +27,15 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   style,
   contentContainerStyle,
 }) => {
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const androidStatusBar = RNStatusBar.currentHeight ?? 36;
   const topInset = Platform.OS === 'android' ? Math.max(insets.top, androidStatusBar) : insets.top;
   const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 16) : insets.bottom;
 
   return (
-    <View style={[styles.root, { paddingTop: topInset }, style]}>
-      <StatusBar style="light" />
+    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }, style]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

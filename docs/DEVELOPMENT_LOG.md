@@ -4,6 +4,36 @@ This log tracks chronologically all major engineering operations, milestones ach
 
 ---
 
+## [2026-11-05] — RC-1 Stabilisation, SQLite Migration 5, Experience Modes, Dynamic Themes & Motion Coaching
+
+### Actions Executed:
+1. **Critical Database Schema Migration (Phase 1):**
+   - Diagnosed root cause of physical device runtime crash (`Error code 1: no such column: is_deleted` on `workout_sets`).
+   - Authored **Migration 5** in `apps/mobile/src/db/migrations.ts` executing safe, idempotent `ALTER TABLE` statements for missing columns (`is_deleted`, `client_created_at`, `client_updated_at` on `workout_sets`; `date`, `measured_at`, `encrypted_photo_uri` on `body_measurements`; `experience_mode`, `theme_appearance`, `theme_color` on `user_profiles`; `source`, `sleep_stages` on `sleep_logs`).
+   - Added startup fail-safe `ensureSchemaConsistency(db)` guaranteeing schema stability.
+   - Authored migration regression test suite `migrations_and_persistence.test.ts` verifying fresh installs and seamless upgrades from legacy databases.
+2. **Beginner vs. Advanced Experience Modes (Phase 6):**
+   - Added `experienceMode: 'beginner' | 'advanced'` across domain, shared-types, and mobile stores.
+   - Beginner Mode: Focuses on form cues, plain language, and minimal set tracking.
+   - Advanced Mode: Surfaces RPE (1-10), tonnage volume load in kg, and estimated 1RM calculations.
+3. **Appearance & Color Theme Engine (Phase 9):**
+   - Created centralized theme store (`apps/mobile/src/store/themeStore.ts`) supporting 3 appearance modes (`dark`, `light`, `system`) and 4 color palettes (`emerald`, `ocean`, `violet`, `neutral`).
+   - Connected all atomic components and status bars dynamically to `useTheme()`.
+4. **Biomechanical Visual Avatar & Coaching Guidance (Phase 2):**
+   - Added interactive Front vs. Side view toggle to `WorkoutAvatar.tsx`.
+   - Wired physiological "What You Should Feel" and "What This Improves" callouts directly into the active exercise HUD.
+5. **Automated Motion Push-Up Repetition Tracker (Phase 3):**
+   - Created `apps/mobile/app/pushup-tracker.tsx` with placement guidelines (15-20cm in front of chest), chest descent inflection detection, form guidance, and manual adjustment (+1 / -1) fallback.
+6. **Health Connect & Sleep Integration (Phase 4 & Phase 5):**
+   - Created `healthConnect.ts` service with deduplication and source attribution.
+   - Created `activityStore.ts` tracking daily steps and live activity sessions.
+7. **Release Verification:**
+   - Monorepo TypeScript check (`npm run typecheck`): 5/5 packages passed.
+   - Test suites (`npm test`): 133/133 tests passed across all packages.
+   - Android Release APK: Compiled via Gradle `assembleRelease` with Exit Code 0 (`app-release.apk`, 96.1 MB).
+
+---
+
 ## [2026-11-03] — Foundation, Governance & Master Blueprint Formulation
 
 ### Actions Executed:
