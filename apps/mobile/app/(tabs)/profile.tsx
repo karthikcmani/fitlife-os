@@ -15,15 +15,23 @@ import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
 import { Button } from '../../src/components/ui/Button';
 import { useAuthStore, getStoredAccessToken } from '../../src/store/authStore';
 import { useCoachStore } from '../../src/store/coachStore';
-import { EquipmentItem } from '../../src/types';
+import { useWorkoutStore } from '../../src/store/workoutStore';
+import { TrainingEnvironment, EquipmentItem, UserProfile } from '../../src/types';
 import { SyncManager } from '../../src/services/syncManager';
 import { localNotificationManager, LocalNotificationSchedule } from '../../src/services/localNotifications';
 import { theme } from '../../src/theme';
-import { calculateBmrMifflinStJeor, calculateTdee, calculateAgeFromDob } from '../../src/domain';
+import {
+  calculateBmrMifflinStJeor,
+  calculateTdee,
+  calculateAgeFromDob,
+  generatePersonalCoachingPlan,
+} from '../../src/domain';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { profile, setProfile, isAuthenticated, backendUrl, logout, setBackendUrl } = useAuthStore();
+  const { saveAndActivatePlan } = useCoachStore();
+  const { activeSession } = useWorkoutStore();
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [serverUrlInput, setServerUrlInput] = useState(backendUrl);
@@ -35,6 +43,13 @@ export default function ProfileScreen() {
   const [editHeight, setEditHeight] = useState(profile ? String(profile.heightCm) : '');
   const [editWater, setEditWater] = useState(profile ? String(profile.dailyWaterTargetMl) : '3000');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // In-Place Environment & Equipment State
+  const [isEditingEnv, setIsEditingEnv] = useState(false);
+  const [selectedEnv, setSelectedEnv] = useState<TrainingEnvironment>(profile?.trainingEnvironment ?? 'home');
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentItem[]>(profile?.equipmentInventory ?? ['none']);
+  const [selectedUnavailable, setSelectedUnavailable] = useState<EquipmentItem[]>(profile?.unavailableEquipment ?? []);
+  const [isSavingEnv, setIsSavingEnv] = useState(false);
 
   // Notification schedules
   const [schedules, setSchedules] = useState<LocalNotificationSchedule[]>([]);
@@ -50,6 +65,9 @@ export default function ProfileScreen() {
       setEditWeight(String(profile.currentWeightKg));
       setEditHeight(String(profile.heightCm));
       setEditWater(String(profile.dailyWaterTargetMl));
+      setSelectedEnv(profile.trainingEnvironment ?? 'home');
+      setSelectedEquipment(profile.equipmentInventory ?? ['none']);
+      setSelectedUnavailable(profile.unavailableEquipment ?? []);
     }
   }, [profile]);
 
@@ -97,6 +115,66 @@ export default function ProfileScreen() {
       Alert.alert('Error', e?.message ?? 'Failed to update profile.');
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleToggleEquipment = (item: EquipmentItem) => {
+    if (item === 'none') {
+      setSelectedEquipment(['none']);
+      return;
+    }
+    const filtered = selectedEquipment.filter((x) => x !== 'none');
+    if (filtered.includes(item)) {
+      const next = filtered.filter((x) => x !== item);
+      setSelectedEquipment(next.length === 0 ? ['none'] : next);
+    } else {
+      setSelectedEquipment([...filtered, item]);
+    }
+  };
+
+  const handleToggleUnavailableMachine = (machine: EquipmentItem) => {
+    if (selectedUnavailable.includes(machine)) {
+      setSelectedUnavailable(selectedUnavailable.filter((x) => x !== machine));
+    } else {
+      setSelectedUnavailable([...selectedUnavailable, machine]);
+    }
+  };
+
+  const handleSaveEnvironmentAndEquipment = async () => {
+    if (!profile) return;
+    setIsSavingEnv(true);
+    try {
+      if (activeSession) {
+        Alert.alert(
+          'Workout In Progress',
+          'You have an active workout in progress. It is safely preserved. Your newly generated plan will apply to your next session.'
+        );
+      }
+
+      const updatedProfile: UserProfile = {
+        ...profile,
+        trainingEnvironment: selectedEnv,
+        equipmentInventory:
+          selectedEnv === 'gym'
+            ? ['barbell', 'bench', 'dumbbells', 'cable_machine']
+            : selectedEquipment,
+        unavailableEquipment: selectedEnv === 'gym' ? selectedUnavailable : [],
+        updatedAt: new Date().toISOString(),
+      };
+
+      await setProfile(updatedProfile);
+      const newPlan = generatePersonalCoachingPlan(updatedProfile);
+      await saveAndActivatePlan(newPlan);
+
+      setIsEditingEnv(false);
+      Alert.alert(
+        'Plan Regenerated! 🎯',
+        `Your personal workouts have been updated for ${selectedEnv.toUpperCase()} training.`
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Failed to update environment and regenerate plan.');
+    } finally {
+      setIsSavingEnv(false);
     }
   };
 
@@ -249,10 +327,17 @@ export default function ProfileScreen() {
                 </Text>
                 <Text style={styles.envText}>
                   🛠 Equipment:{' '}
-                  {profile?.equipmentInventory?.includes('none')
-                    ? 'None (Bodyweight)'
+                  {profile?.trainingEnvironment === 'gym'
+                    ? 'Full Commercial Gym'
+                    : profile?.equipmentInventory?.includes('none')
+                    ? 'None (Strict Bodyweight)'
                     : profile?.equipmentInventory?.join(', ') || 'Bodyweight'}
                 </Text>
+                {Boolean(profile?.unavailableEquipment?.length) && profile?.trainingEnvironment === 'gym' && (
+                  <Text style={[styles.envText, { color: theme.colors.warning }]}>
+                    ⚠️ Excluded Machines: {profile?.unavailableEquipment?.join(', ')}
+                  </Text>
+                )}
                 <Text style={styles.envText}>
                   🥗 Diet:{' '}
                   {profile?.dietaryPreference
@@ -262,12 +347,161 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <Button
-              title="Update Goal, Location & Equipment ⚙️"
-              variant="secondary"
-              onPress={() => router.push('/onboarding')}
-              style={styles.recalBtn}
-            />
+            {isEditingEnv ? (
+              <View style={styles.envEditorCard}>
+                <Text style={styles.envEditorHeading}>Select Training Environment</Text>
+                <View style={styles.envGrid}>
+                  {[
+                    { id: 'home', label: 'Home 🏠', desc: 'Living room & home workout' },
+                    { id: 'gym', label: 'Commercial Gym 🏋️', desc: 'Machines, cables & barbells' },
+                    { id: 'outdoor', label: 'Outdoor 🌳', desc: 'Brisk walking, jogging & park' },
+                    { id: 'calisthenics', label: 'Calisthenics 🤸', desc: 'Bars, pull-ups & bodyweight' },
+                  ].map((env) => (
+                    <TouchableOpacity
+                      key={env.id}
+                      style={[
+                        styles.envSelectBtn,
+                        selectedEnv === env.id && styles.envSelectBtnActive,
+                      ]}
+                      onPress={() => setSelectedEnv(env.id as TrainingEnvironment)}
+                    >
+                      <Text
+                        style={[
+                          styles.envSelectText,
+                          selectedEnv === env.id && styles.envSelectTextActive,
+                        ]}
+                      >
+                        {env.label}
+                      </Text>
+                      <Text style={styles.envSelectDesc}>{env.desc}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Equipment for Home */}
+                {selectedEnv === 'home' && (
+                  <View style={styles.equipSection}>
+                    <Text style={styles.equipSectionTitle}>Available Home Equipment:</Text>
+                    <View style={styles.chipWrap}>
+                      {[
+                        { id: 'none', label: 'None (Bodyweight only)' },
+                        { id: 'dumbbells', label: 'Dumbbells' },
+                        { id: 'resistance_bands', label: 'Resistance Bands' },
+                        { id: 'kettlebell', label: 'Kettlebell' },
+                        { id: 'pull_up_bar', label: 'Pull-Up Bar' },
+                        { id: 'bench', label: 'Workout Bench' },
+                        { id: 'barbell', label: 'Barbell' },
+                      ].map((eq) => {
+                        const isSelected = selectedEquipment.includes(eq.id as EquipmentItem);
+                        return (
+                          <TouchableOpacity
+                            key={eq.id}
+                            style={[styles.equipChip, isSelected && styles.equipChipActive]}
+                            onPress={() => handleToggleEquipment(eq.id as EquipmentItem)}
+                          >
+                            <Text
+                              style={[styles.equipChipText, isSelected && styles.equipChipTextActive]}
+                            >
+                              {isSelected ? '✓ ' : '+ '}
+                              {eq.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Gym Unavailable Machines */}
+                {selectedEnv === 'gym' && (
+                  <View style={styles.equipSection}>
+                    <Text style={styles.equipSectionTitle}>
+                      Commercial Gym Setup (Full machines included).
+                    </Text>
+                    <Text style={styles.equipSectionSubtitle}>
+                      Tap any machine below that is unavailable or broken at your gym to exclude it from your plan:
+                    </Text>
+                    <View style={styles.chipWrap}>
+                      {[
+                        { id: 'leg_press_machine', label: 'Leg Press' },
+                        { id: 'lat_pulldown_machine', label: 'Lat Pulldown' },
+                        { id: 'chest_press_machine', label: 'Chest Press Machine' },
+                        { id: 'cable_machine', label: 'Cable Machine' },
+                        { id: 'seated_row_machine', label: 'Seated Cable Row' },
+                        { id: 'leg_curl_machine', label: 'Leg Curl Machine' },
+                        { id: 'shoulder_press_machine', label: 'Shoulder Press Machine' },
+                      ].map((m) => {
+                        const isUnavailable = selectedUnavailable.includes(m.id as EquipmentItem);
+                        return (
+                          <TouchableOpacity
+                            key={m.id}
+                            style={[styles.equipChip, isUnavailable && styles.equipChipWarning]}
+                            onPress={() => handleToggleUnavailableMachine(m.id as EquipmentItem)}
+                          >
+                            <Text
+                              style={[
+                                styles.equipChipText,
+                                isUnavailable && styles.equipChipTextWarning,
+                              ]}
+                            >
+                              {isUnavailable ? '✕ Unavailable' : '✓ Available'}: {m.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Outdoor Info */}
+                {selectedEnv === 'outdoor' && (
+                  <View style={styles.envInfoBox}>
+                    <Text style={styles.envInfoText}>
+                      🌳 Outdoor plan focuses on power walking, jogging, park benches, and open-air mobility. Zero gym equipment needed!
+                    </Text>
+                  </View>
+                )}
+
+                {/* Calisthenics Info */}
+                {selectedEnv === 'calisthenics' && (
+                  <View style={styles.envInfoBox}>
+                    <Text style={styles.envInfoText}>
+                      🤸 Calisthenics plan emphasizes bar pull-ups, active hangs, dips, and advanced bodyweight levers.
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.envEditorActionRow}>
+                  <Button
+                    title="Save & Regenerate Plan 🔄"
+                    onPress={handleSaveEnvironmentAndEquipment}
+                    loading={isSavingEnv}
+                    style={{ flex: 2 }}
+                  />
+                  <Button
+                    title="Cancel"
+                    variant="outline"
+                    onPress={() => setIsEditingEnv(false)}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+            ) : (
+              <View style={{ marginTop: theme.spacing.sm }}>
+                <Button
+                  title="Change Training Environment & Equipment 🏋️"
+                  variant="primary"
+                  onPress={() => setIsEditingEnv(true)}
+                  style={{ marginBottom: theme.spacing.xs }}
+                />
+                <Button
+                  title="Recalibrate All Metrics (Wizard) ⚙️"
+                  variant="secondary"
+                  onPress={() => router.push('/onboarding')}
+                  style={styles.recalBtn}
+                />
+              </View>
+            )}
           </>
         )}
       </SurfaceCard>
@@ -518,5 +752,108 @@ const styles = StyleSheet.create({
   },
   authBtn: {
     marginBottom: theme.spacing.sm,
+  },
+  envEditorCard: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceElevated,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  envEditorHeading: {
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.sm,
+  },
+  envGrid: {
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  envSelectBtn: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+  },
+  envSelectBtnActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: 'rgba(0, 230, 153, 0.1)',
+  },
+  envSelectText: {
+    ...theme.typography.bodyBold,
+    color: theme.colors.textSecondary,
+  },
+  envSelectTextActive: {
+    color: theme.colors.primary,
+  },
+  envSelectDesc: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  equipSection: {
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.md,
+  },
+  equipSectionTitle: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  equipSectionSubtitle: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  equipChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  equipChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  equipChipWarning: {
+    backgroundColor: 'rgba(255, 75, 75, 0.15)',
+    borderColor: theme.colors.danger,
+  },
+  equipChipText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+  },
+  equipChipTextActive: {
+    color: theme.colors.textInverse,
+  },
+  equipChipTextWarning: {
+    color: theme.colors.danger,
+  },
+  envInfoBox: {
+    backgroundColor: 'rgba(0, 230, 153, 0.08)',
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    marginBottom: theme.spacing.md,
+  },
+  envInfoText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    lineHeight: 18,
+  },
+  envEditorActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: theme.spacing.xs,
   },
 });

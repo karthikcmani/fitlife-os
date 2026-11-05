@@ -4,11 +4,31 @@ import { getLocalDatabase } from '../db/sqlite';
 import { SyncManager } from '../services/syncManager';
 import { estimate1RmBrzycki } from '../domain';
 
+export interface CompletedExerciseSummary {
+  name: string;
+  sets: {
+    weightKg: number;
+    reps: number;
+    rpe?: number;
+  }[];
+}
+
+export interface WorkoutCompletedSummary {
+  sessionId: string;
+  title: string;
+  startedAt: string;
+  endedAt: string;
+  durationMinutes: number;
+  totalSets: number;
+  exercises: CompletedExerciseSummary[];
+}
+
 interface WorkoutState {
   exercises: Exercise[];
   recentSessions: WorkoutSession[];
   activeSession: WorkoutSession | null;
   activeSets: WorkoutSet[];
+  lastCompletedSummary: WorkoutCompletedSummary | null;
   isLoading: boolean;
 
   // Actions
@@ -16,8 +36,9 @@ interface WorkoutState {
   loadRecentSessions: () => Promise<void>;
   startWorkout: (title: string, userId: string) => Promise<void>;
   addSetToActive: (exerciseId: string, weightKg: number, reps: number, rpe?: number) => Promise<void>;
-  finishWorkout: () => Promise<void>;
+  finishWorkout: (summary?: WorkoutCompletedSummary) => Promise<void>;
   cancelWorkout: () => void;
+  setLastCompletedSummary: (summary: WorkoutCompletedSummary | null) => void;
 }
 
 export const useWorkoutStore = create<WorkoutState>((set, get) => ({
@@ -25,6 +46,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   recentSessions: [],
   activeSession: null,
   activeSets: [],
+  lastCompletedSummary: null,
   isLoading: false,
 
   loadExercises: async (search, muscleGroup, difficulty) => {
@@ -249,13 +271,20 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     }));
   },
 
-  finishWorkout: async () => {
+  finishWorkout: async (summary) => {
     const active = get().activeSession;
     if (!active) return;
 
     const now = new Date().toISOString();
     const db = await getLocalDatabase();
 
+    // 1. Mark all completed sets
+    await db.runAsync(
+      `UPDATE workout_sets SET is_completed = 1 WHERE workout_session_id = ?;`,
+      [active.id]
+    );
+
+    // 2. Mark workout session ended
     await db.runAsync(
       `UPDATE workout_sessions SET ended_at = ?, client_updated_at = ? WHERE id = ?;`,
       [now, now, active.id]
@@ -266,8 +295,16 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       clientUpdatedAt: now,
     });
 
-    set({ activeSession: null, activeSets: [] });
+    set({
+      activeSession: null,
+      activeSets: [],
+      lastCompletedSummary: summary ?? null,
+    });
     await get().loadRecentSessions();
+  },
+
+  setLastCompletedSummary: (summary) => {
+    set({ lastCompletedSummary: summary });
   },
 
   cancelWorkout: async () => {

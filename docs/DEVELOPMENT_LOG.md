@@ -244,3 +244,37 @@ This log tracks chronologically all major engineering operations, milestones ach
    - `npm test` across all workspaces: **7/7 test suites passed, 119/119 unit tests passed (exit code 0)**.
    - Android Native Release Build: Executed `.\gradlew.bat assembleRelease` $\rightarrow$ **BUILD SUCCESSFUL in 1m 11s**.
    - Generated release APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (Size: 96,095,409 bytes, SHA-256: `502DFD580678F5A724FC9BBFC427BE537AC59726AF39222A3A84E3883290E14A`).
+
+---
+
+## [2026-11-05] — Dedicated Workout Completion Screen & In-Place Environment Plan Switching
+
+### Actions Executed:
+1. **Dedicated Workout Completed Screen (`apps/mobile/app/workout-completed.tsx`):**
+   - Built a dedicated celebratory workout completion screen that displays workout title, duration in minutes, completion timestamp, total completed sets and repetitions, and a detailed exercise breakdown with recorded weights, reps, and RPE.
+   - Provided prominent action buttons: "Return to Dashboard" and "View Full Progress History".
+   - Integrated SQLite fallback query to reliably resolve session records even if accessed directly.
+2. **Session Termination Safety & Validation (`apps/mobile/app/(tabs)/plan.tsx`):**
+   - Validated session sets prior to termination: if 0 sets are logged, presents an explicit dialog to either log a set or discard the workout cleanly.
+   - If sets completed < planned sets, presents an explicit dialog ("Finish Early?") allowing users to finish and record partial sessions without accidental dismissal.
+   - Guaranteed atomic SQLite updates: marks all sets `is_completed = 1`, marks session `ended_at = now`, sets `lastCompletedSummary`, and transitions to `/workout-completed`.
+   - Wrap-around error boundaries ensure that if database persistence encounters an error, the active session is preserved and user data is never lost.
+3. **Environment-Specific Exercise Catalog Expansion (`packages/domain/` & `apps/mobile/src/domain/`):**
+   - Expanded `COACH_EXERCISE_CATALOG` with full commercial gym machines (Seated Leg Press, Seated Chest Press Machine, Cable Lat Pulldown, Seated Cable Row, Seated Leg Curl Machine, Overhead Shoulder Press Machine, Barbell Bench Press).
+   - Added Outdoor routines (Brisk Aerobic Power Walk, Park Bench Step-Ups, Park Bench Incline Push-Ups, Walking Lunges).
+   - Added Calisthenics routines (Bar Pull-Ups, Active Hangs, Parallel Bar Dips, Diamond Push-Ups, Horizontal Inverted Rows).
+   - Implemented equipment priority sorting ensuring commercial gym workouts strictly feature machines and free weights, while home bodyweight setups strictly feature bodyweight movements.
+4. **In-Place Environment & Equipment Editor (`apps/mobile/app/(tabs)/profile.tsx`):**
+   - Replaced redirection to full wizard with an instant in-place editor.
+   - Users can toggle between **Home**, **Commercial Gym**, **Outdoor**, and **Calisthenics** with 1 tap.
+   - For Home: multi-select available equipment (Dumbbells, Bands, Kettlebell, Bench, Barbell, Pull-Up Bar, None).
+   - For Gym: includes an interactive machine exclusion checklist to mark broken or unavailable gym equipment (e.g., Leg Press, Lat Pulldown).
+   - Automatically saves updated profile to SQLite and regenerates the active personal coaching plan immediately, preserving active workouts if one is currently in progress.
+5. **Real-Time Data Refresh on Tab Navigation:**
+   - Integrated `useFocusEffect` across Dashboard (`index.tsx`), My Plan (`plan.tsx`), and Progress (`progress.tsx`) to guarantee instant view synchronization when returning from a workout or modifying user profile settings.
+6. **Testing & Verification:**
+   - Authored regression test suite `apps/mobile/src/__tests__/workout_and_coach_env.test.ts`.
+   - Executed `npm test` across all workspaces: **7/7 test suites passed, 130/130 unit tests passed (exit code 0)**.
+   - Executed `npm run typecheck` across all workspaces: **5/5 packages passed (0 errors)**.
+   - Android Native Release Build: Executed `.\gradlew.bat assembleRelease` $\rightarrow$ **BUILD SUCCESSFUL in 1m 8s**.
+   - Output APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (Size: 96,127,729 bytes, SHA-256: `85C2D4B6406EF100F8BD99AA4D90BF6F16C45693E5041D1BA030D9488832D943`).

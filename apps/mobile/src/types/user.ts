@@ -19,7 +19,7 @@ export type PrimaryGoal =
   | 'stamina'
   | 'health_consistency';
 
-export type TrainingEnvironment = 'gym' | 'home' | 'calisthenics';
+export type TrainingEnvironment = 'gym' | 'home' | 'calisthenics' | 'outdoor';
 
 export type EquipmentItem =
   | 'none'
@@ -29,7 +29,15 @@ export type EquipmentItem =
   | 'bench'
   | 'kettlebell'
   | 'pull_up_bar'
-  | 'exercise_mat';
+  | 'exercise_mat'
+  | 'cable_machine'
+  | 'leg_press_machine'
+  | 'chest_press_machine'
+  | 'lat_pulldown_machine'
+  | 'seated_row_machine'
+  | 'leg_curl_machine'
+  | 'shoulder_press_machine'
+  | 'other';
 
 export type SessionDurationMinutes = 20 | 30 | 45 | 60;
 
@@ -121,6 +129,7 @@ export interface UserProfile {
   availableTrainingDays?: number; // 2 to 6 days per week
   sessionDurationMinutes?: SessionDurationMinutes;
   equipmentInventory?: EquipmentItem[];
+  unavailableEquipment?: EquipmentItem[];
   dietaryPreference?: DietaryPreference;
   injuriesOrLimitations?: PhysicalLimitation[];
   bodyMeasurements?: BodyMeasurements;
@@ -143,6 +152,7 @@ export interface ProfileSetupInput {
   availableTrainingDays?: number;
   sessionDurationMinutes?: SessionDurationMinutes;
   equipmentInventory?: EquipmentItem[];
+  unavailableEquipment?: EquipmentItem[];
   dietaryPreference?: DietaryPreference;
   injuriesOrLimitations?: PhysicalLimitation[];
   bodyMeasurements?: BodyMeasurements;

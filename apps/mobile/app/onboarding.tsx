@@ -469,7 +469,8 @@ export default function OnboardingScreen() {
             {[
               { id: 'home', title: '🏡 Home Workout', desc: 'Exercise in living room or bedroom.' },
               { id: 'gym', title: '🏢 Commercial Gym', desc: 'Access to machines, barbells, dumbbells, cables.' },
-              { id: 'calisthenics', title: '🤸 Calisthenics / Park', desc: 'Bodyweight training using bars and open space.' },
+              { id: 'outdoor', title: '🌳 Outdoor Fitness', desc: 'Cardio intervals, power walking, bodyweight & benches.' },
+              { id: 'calisthenics', title: '🤸 Calisthenics / Park', desc: 'Bodyweight strength using pull-up bars and dips.' },
             ].map((env) => (
               <TouchableOpacity
                 key={env.id}

@@ -294,4 +294,23 @@ export async function runLocalMigrations(db: SQLiteDatabase): Promise<void> {
       [Date.now()]
     );
   }
+
+  const applied4 = await db.getAllAsync<{ version: number }>(
+    `SELECT version FROM _local_migrations WHERE version = 4`
+  );
+
+  if (applied4.length === 0) {
+    try {
+      await db.execAsync(`
+        ALTER TABLE user_profiles ADD COLUMN unavailable_equipment TEXT NOT NULL DEFAULT '[]';
+      `);
+    } catch {
+      // Column may already exist
+    }
+
+    await db.runAsync(
+      `INSERT INTO _local_migrations (version, applied_at) VALUES (4, ?);`,
+      [Date.now()]
+    );
+  }
 }

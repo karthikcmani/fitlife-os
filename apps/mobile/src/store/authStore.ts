@@ -58,6 +58,9 @@ export const useAuthStore = create<AuthState>((set) => ({
             equipmentInventory: localProfile.equipment_inventory
               ? JSON.parse(localProfile.equipment_inventory)
               : ['none'],
+            unavailableEquipment: localProfile.unavailable_equipment
+              ? JSON.parse(localProfile.unavailable_equipment)
+              : [],
             dietaryPreference: localProfile.dietary_preference ?? 'vegetarian',
             injuriesOrLimitations: localProfile.injuries_or_limitations
               ? JSON.parse(localProfile.injuries_or_limitations)
@@ -96,8 +99,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     const db = await getLocalDatabase();
     await db.runAsync(
       `INSERT OR REPLACE INTO user_profiles
-      (user_id, display_name, date_of_birth, gender, height_cm, current_weight_kg, fitness_level, activity_level, primary_goal, training_environment, available_training_days, session_duration_minutes, equipment_inventory, dietary_preference, injuries_or_limitations, body_measurements, preferred_unit_system, daily_water_target_ml, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      (user_id, display_name, date_of_birth, gender, height_cm, current_weight_kg, fitness_level, activity_level, primary_goal, training_environment, available_training_days, session_duration_minutes, equipment_inventory, dietary_preference, injuries_or_limitations, body_measurements, preferred_unit_system, daily_water_target_ml, unavailable_equipment, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         profile.userId,
         profile.displayName,
@@ -117,6 +120,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         JSON.stringify(profile.bodyMeasurements ?? {}),
         profile.preferredUnitSystem,
         profile.dailyWaterTargetMl,
+        JSON.stringify(profile.unavailableEquipment ?? []),
         profile.createdAt,
         profile.updatedAt,
       ]

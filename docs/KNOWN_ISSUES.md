@@ -100,3 +100,17 @@ This document logs architectural trade-offs, discovered technical risks, upstrea
   - Built an Equipment-Aware Coaching Generator that strictly respects home equipment (e.g. bodyweight only when no equipment is available).
   - Built an Animated Biomechanical Exercise Avatar (`WorkoutAvatar.tsx`) that visually demonstrates exercise movements on action with real-time breathing and tempo cues.
   - Simplified language across all screens (e.g. "Resting Energy" instead of "Basal Metabolic Rate", "Daily Burn" instead of "TDEE").
+
+### 4.8 Finish Workout Flow & Dedicated Completion Screen
+- **Issue Discovered on Device:** Tapping "Finish & Save Workout" on Nothing Phone (3a) snapped directly back to the unstarted workout overview without showing a completion screen or summary, leaving users unsure if their workout was saved.
+- **Resolution:**
+  - Added session completion validation: checks if 0 sets were logged and displays a warning to either complete a set or discard; checks if completed sets < planned sets and confirms whether the user wishes to finish early.
+  - Built a dedicated Workout Completed Screen (`app/workout-completed.tsx`) displaying session duration, total completed sets and reps, exercises breakdown, celebratory feedback, and direct navigation buttons to "Return to Home" and "View Progress".
+  - Updated `useFocusEffect` hooks on Dashboard, Plan, and Progress tabs to ensure real-time data synchronization.
+
+### 4.9 Real-Time Plan Regeneration on Training Environment Changes
+- **Issue Discovered on Device:** Changing training environment from Home to Gym in the user profile did not update the active coaching plan, leaving home bodyweight exercises active even after selecting gym equipment.
+- **Resolution:**
+  - Expanded the exercise catalog with genuine commercial gym machines (Leg Press, Seated Chest Press Machine, Cable Lat Pulldown, Cable Row, Leg Curl Machine, Overhead Shoulder Press Machine, Barbell Bench Press), outdoor cardio/park circuits, and calisthenics progressions.
+  - Implemented an interactive In-Place Environment & Equipment Editor directly in `ProfileScreen` with full support for selecting Home, Gym, Outdoor, and Calisthenics, plus a checklist to mark broken or unavailable machines.
+  - Regenerates and saves the personal coaching plan immediately upon environment change, preserving active workouts if one is in progress and displaying clear plan transparency rationales.

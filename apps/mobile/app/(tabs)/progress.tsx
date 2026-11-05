@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { Header } from '../../src/components/ui/Header';
 import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
@@ -39,11 +40,13 @@ export default function ProgressScreen() {
   const userId = profile?.userId ?? 'local_user';
   const dateStr = getLocalDateString();
 
-  useEffect(() => {
-    loadRecentSessions();
-    loadActivePlan(userId);
-    loadWeightHistory();
-  }, [userId]);
+  useFocusEffect(
+    useCallback(() => {
+      loadRecentSessions();
+      loadActivePlan(userId);
+      loadWeightHistory();
+    }, [userId])
+  );
 
   const loadWeightHistory = async () => {
     try {

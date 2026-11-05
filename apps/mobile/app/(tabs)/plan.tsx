@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,13 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
 import { Button } from '../../src/components/ui/Button';
 import { useAuthStore } from '../../src/store/authStore';
 import { useCoachStore } from '../../src/store/coachStore';
-import { useWorkoutStore } from '../../src/store/workoutStore';
+import { useWorkoutStore, WorkoutCompletedSummary } from '../../src/store/workoutStore';
 import { useNutritionStore } from '../../src/store/nutritionStore';
 import { useVitalsStore } from '../../src/store/vitalsStore';
 import { theme } from '../../src/theme';
@@ -22,6 +23,7 @@ import { getLocalDateString } from '../../src/domain';
 import { WorkoutAvatar } from '../../src/components/coach/WorkoutAvatar';
 
 export default function MyPlanScreen() {
+  const router = useRouter();
   const { profile } = useAuthStore();
   const {
     activePlan,
@@ -61,11 +63,13 @@ export default function MyPlanScreen() {
 
   const userId = profile?.userId ?? 'local_user';
 
-  useEffect(() => {
-    loadActivePlan(userId);
-    loadRecentSessions();
-    loadTodayNutrition(userId, dateStr);
-  }, [userId, dateStr]);
+  useFocusEffect(
+    useCallback(() => {
+      loadActivePlan(userId);
+      loadRecentSessions();
+      loadTodayNutrition(userId, dateStr);
+    }, [userId, dateStr])
+  );
 
   // Rest Timer Interval
   useEffect(() => {
@@ -156,11 +160,97 @@ export default function MyPlanScreen() {
     }
   };
 
-  // Finish Workout
+  // Build completed session summary and commit
+  const commitWorkoutCompletion = async () => {
+    if (!activeSession) return;
+    try {
+      const startedAt = activeSession.startedAt;
+      const endedAt = new Date().toISOString();
+      const durMin = Math.max(1, Math.round((Date.now() - new Date(startedAt).getTime()) / 60000));
+
+      // Group logged sets by exercise
+      const exMap = new Map<string, { name: string; sets: Array<{ weightKg: number; reps: number; rpe?: number }> }>();
+      activeSets.forEach((s) => {
+        const foundEx = routineExercises.find((e) => e.exerciseId === s.exerciseId);
+        const name = foundEx ? foundEx.name : (s.exerciseId || 'Exercise');
+        if (!exMap.has(name)) {
+          exMap.set(name, { name, sets: [] });
+        }
+        exMap.get(name)!.sets.push({
+          weightKg: s.weightKg,
+          reps: s.reps,
+          rpe: s.rpe,
+        });
+      });
+
+      const summary: WorkoutCompletedSummary = {
+        sessionId: activeSession.id,
+        title: activeSession.title,
+        startedAt,
+        endedAt,
+        durationMinutes: isNaN(durMin) ? 25 : durMin,
+        totalSets: activeSets.length,
+        exercises: Array.from(exMap.values()),
+      };
+
+      await finishWorkout(summary);
+      stopRestTimer();
+      router.replace('/workout-completed');
+    } catch (err: any) {
+      Alert.alert(
+        'Save Error',
+        `Unable to save workout right now: ${err?.message || 'Database error'}. Your current session remains active.`
+      );
+    }
+  };
+
+  // Finish Workout with validation and safety confirmations
   const handleFinishWorkout = async () => {
-    await finishWorkout();
-    stopRestTimer();
-    Alert.alert('🎉 Workout Finished!', 'Great job! Your completed session and sets have been saved.');
+    if (!activeSession) return;
+
+    if (activeSets.length === 0) {
+      Alert.alert(
+        'No Sets Logged',
+        'You haven\'t logged any completed sets yet. Log at least one set before finishing, or tap Cancel if you wish to exit without saving.',
+        [
+          { text: 'Keep Training', style: 'cancel' },
+          {
+            text: 'Discard Workout',
+            style: 'destructive',
+            onPress: async () => {
+              await cancelWorkout();
+              stopRestTimer();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    const totalPlannedSets = routineExercises.reduce(
+      (sum, e) => sum + (e.recommendedSets || 3),
+      0
+    );
+
+    if (activeSets.length < totalPlannedSets) {
+      Alert.alert(
+        'Finish Early?',
+        `You have completed ${activeSets.length} of ${totalPlannedSets} planned sets for this routine. Would you like to finish and save now?`,
+        [
+          { text: 'Keep Training', style: 'cancel' },
+          {
+            text: 'Finish & Save',
+            onPress: () => {
+              commitWorkoutCompletion();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // All sets complete: save immediately and celebrate
+    await commitWorkoutCompletion();
   };
 
   return (
@@ -208,6 +298,12 @@ export default function MyPlanScreen() {
                     : profile?.equipmentInventory?.join(', ') || 'available equipment'}
                   .
                 </Text>
+
+                {Boolean(activePlan?.whyThisPlanGenerated) && (
+                  <View style={styles.planWhyBox}>
+                    <Text style={styles.planWhyText}>💡 {activePlan?.whyThisPlanGenerated}</Text>
+                  </View>
+                )}
 
                 {/* 5-Min Warmup Card */}
                 <View style={styles.warmupBox}>
@@ -951,6 +1047,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: theme.spacing.sm,
+  },
+  planWhyBox: {
+    backgroundColor: 'rgba(0, 230, 153, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    marginVertical: theme.spacing.sm,
+  },
+  planWhyText: {
+    ...theme.typography.captionBold,
+    color: theme.colors.primary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   ateThisBtn: {
     flex: 2,

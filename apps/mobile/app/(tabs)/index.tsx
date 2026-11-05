@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '../../src/components/ui/ScreenContainer';
 import { SurfaceCard } from '../../src/components/ui/SurfaceCard';
 import { Button } from '../../src/components/ui/Button';
@@ -43,12 +43,14 @@ export default function HomeScreen() {
       ? 'Good evening'
       : 'Good night';
 
-  useEffect(() => {
-    loadRecentSessions();
-    loadTodayNutrition(userId, dateStr);
-    loadVitals(userId, dateStr);
-    loadActivePlan(userId);
-  }, [userId, dateStr]);
+  useFocusEffect(
+    useCallback(() => {
+      loadRecentSessions();
+      loadTodayNutrition(userId, dateStr);
+      loadVitals(userId, dateStr);
+      loadActivePlan(userId);
+    }, [userId, dateStr])
+  );
 
   // Today's completed workout check
   const todayCompletedSession = recentSessions.find(
